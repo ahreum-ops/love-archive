@@ -1,30 +1,39 @@
 "use client";
 
 import { useState } from "react";
-import { signIn, signUp } from "@/lib/store";
+import { sendPasswordReset, setNewPassword, signIn, signOut, signUp } from "@/lib/store";
 import { Banner, Button, Field, inputClass } from "./ui";
 
-/** 서버 모드에서 로그인 안 했을 때: 이메일 + 비밀번호 */
+/** 서버 모드에서 로그인 안 했을 때: 이메일 + 비밀번호 (잊었으면 재설정 메일) */
 export default function Login() {
-  const [mode, setMode] = useState<"in" | "up">("in");
+  const [mode, setMode] = useState<"in" | "up" | "forgot">("in");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [sent, setSent] = useState(false);
+  const [sent, setSent] = useState<"confirm" | "reset" | null>(null);
 
-  const ready = email.includes("@") && password.length >= 6 && !busy;
+  const ready = email.includes("@") && (mode === "forgot" || password.length >= 6) && !busy;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!ready) return;
     setBusy(true);
     setError(null);
+    if (mode === "forgot") {
+      const r = await sendPasswordReset(email.trim());
+      setBusy(false);
+      if (!r.ok) setError(r.error);
+      else setSent("reset");
+      return;
+    }
     const r = mode === "in" ? await signIn(email.trim(), password) : await signUp(email.trim(), password);
     setBusy(false);
     if (!r.ok) setError(r.error);
-    else if ("needsConfirm" in r && r.needsConfirm) setSent(true);
+    else if ("needsConfirm" in r && r.needsConfirm) setSent("confirm");
   }
+
+  const subtitle = { in: "다시 만나서 반가워요", up: "우리 둘만의 추억 보관함을 만들어요", forgot: "가입한 이메일로 재설정 링크를 보내 드려요" }[mode];
 
   return (
     <form onSubmit={submit} className="relative flex min-h-dvh flex-col px-6 pb-10 pt-[calc(env(safe-area-inset-top)+56px)]">
@@ -32,16 +41,20 @@ export default function Login() {
       <div className="mb-10 text-center">
         <div className="mb-4 inline-block animate-float text-6xl">💞</div>
         <h1 className="font-cute text-3xl text-ink">러브아카이브</h1>
-        <p className="mt-2 text-ink-soft">{mode === "in" ? "다시 만나서 반가워요" : "우리 둘만의 추억 보관함을 만들어요"}</p>
+        <p className="mt-2 text-ink-soft">{subtitle}</p>
       </div>
 
       {sent ? (
         <div className="rounded-[32px] bg-white/85 p-6 text-center shadow-soft ring-1 ring-line">
           <p className="text-4xl">💌</p>
           <p className="mt-3 font-cute text-lg text-ink">메일함을 확인해 주세요</p>
-          <p className="mt-1 text-sm text-ink-soft">{email} 로 보낸 인증 링크를 누르면 바로 시작돼요.</p>
-          <Button variant="soft" onClick={() => { setSent(false); setMode("in"); }} className="mt-5">
-            인증했어요, 로그인하기
+          <p className="mt-1 text-sm text-ink-soft">
+            {sent === "reset"
+              ? `${email} 로 보낸 링크를 누르면 새 비밀번호를 정할 수 있어요. 메일이 안 보이면 스팸함도 봐 주세요.`
+              : `${email} 로 보낸 인증 링크를 누르면 바로 시작돼요.`}
+          </p>
+          <Button variant="soft" onClick={() => { setSent(null); setMode("in"); }} className="mt-5">
+            {sent === "reset" ? "로그인으로 돌아가기" : "인증했어요, 로그인하기"}
           </Button>
         </div>
       ) : (
@@ -50,31 +63,88 @@ export default function Login() {
             <Field label="이메일">
               <input type="email" autoComplete="email" className={inputClass} value={email} onChange={(e) => setEmail(e.target.value)} placeholder="love@example.com" />
             </Field>
-            <Field label="비밀번호 (6자 이상)">
-              <input
-                type="password"
-                autoComplete={mode === "in" ? "current-password" : "new-password"}
-                className={inputClass}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-            </Field>
+            {mode !== "forgot" && (
+              <Field label="비밀번호 (6자 이상)">
+                <input
+                  type="password"
+                  autoComplete={mode === "in" ? "current-password" : "new-password"}
+                  className={inputClass}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+              </Field>
+            )}
+            {mode === "in" && (
+              <button type="button" onClick={() => { setMode("forgot"); setError(null); }} className="text-sm text-ink-soft underline underline-offset-4">
+                비밀번호를 잊었어요
+              </button>
+            )}
           </div>
 
           <div className="mt-auto pt-8">
             <Button type="submit" disabled={!ready} className="w-full py-4 text-lg">
-              {busy ? "잠깐만요…" : mode === "in" ? "로그인 💗" : "가입하기 💗"}
+              {busy ? "잠깐만요…" : { in: "로그인 💗", up: "가입하기 💗", forgot: "재설정 메일 보내기 💌" }[mode]}
             </Button>
             <button
               type="button"
-              onClick={() => { setMode(mode === "in" ? "up" : "in"); setError(null); }}
+              onClick={() => { setMode(mode === "up" ? "in" : mode === "forgot" ? "in" : "up"); setError(null); }}
               className="mt-3 w-full py-2 text-center text-sm text-ink-soft"
             >
-              {mode === "in" ? "처음이에요 → 가입하기" : "이미 계정이 있어요 → 로그인"}
+              {mode === "in" ? "처음이에요 → 가입하기" : "로그인으로 돌아가기"}
             </button>
           </div>
         </>
       )}
+    </form>
+  );
+}
+
+/** 재설정 메일의 링크로 들어왔을 때: 새 비밀번호 정하기 */
+export function ResetPassword() {
+  const [password, setPassword] = useState("");
+  const [again, setAgain] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const ready = password.length >= 6 && password === again && !busy;
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!ready) return;
+    setBusy(true);
+    setError(null);
+    const r = await setNewPassword(password);
+    setBusy(false);
+    if (!r.ok) setError(r.error);
+  }
+
+  return (
+    <form onSubmit={submit} className="relative flex min-h-dvh flex-col px-6 pb-10 pt-[calc(env(safe-area-inset-top)+56px)]">
+      <Banner message={error} onClose={() => setError(null)} />
+      <div className="mb-10 text-center">
+        <div className="mb-4 inline-block animate-float text-6xl">🔑</div>
+        <h1 className="font-cute text-3xl text-ink">새 비밀번호 정하기</h1>
+        <p className="mt-2 text-ink-soft">이제 이 비밀번호로 로그인해요</p>
+      </div>
+
+      <div className="space-y-4 rounded-[32px] bg-white/85 p-6 shadow-soft ring-1 ring-line backdrop-blur">
+        <Field label="새 비밀번호 (6자 이상)">
+          <input type="password" autoComplete="new-password" className={inputClass} value={password} onChange={(e) => setPassword(e.target.value)} />
+        </Field>
+        <Field label="한 번 더">
+          <input type="password" autoComplete="new-password" className={inputClass} value={again} onChange={(e) => setAgain(e.target.value)} />
+        </Field>
+        {again.length > 0 && password !== again && <p className="text-sm text-rose">두 비밀번호가 달라요.</p>}
+      </div>
+
+      <div className="mt-auto pt-8">
+        <Button type="submit" disabled={!ready} className="w-full py-4 text-lg">
+          {busy ? "잠깐만요…" : "저장하고 시작하기 💗"}
+        </Button>
+        <button type="button" onClick={() => void signOut()} className="mt-3 w-full py-2 text-center text-sm text-ink-soft">
+          취소하고 로그인으로
+        </button>
+      </div>
     </form>
   );
 }

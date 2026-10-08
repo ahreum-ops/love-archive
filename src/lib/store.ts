@@ -33,6 +33,7 @@ export type SaveResult = { ok: true } | { ok: false; error: string };
 export type Session =
   | { status: "loading" }
   | { status: "signed-out" }
+  | { status: "recovery" }
   | { status: "no-couple"; email: string }
   | { status: "ready"; email: string; who: Who; inviteCode: string; partnerJoined: boolean };
 
@@ -161,6 +162,8 @@ export function trialData(): AppState | null {
 type Pending = { fn: (s: AppState) => AppState; cache?: { base: AppState; value: AppState } };
 
 let started = false;
+/** 비번 재설정 링크로 들어와 아직 새 비밀번호를 안 정함 */
+let recovering = false;
 let coupleId: string | null = null;
 /** 서버에 저장된 마지막 state (profile.me 는 이 기기 사람으로 바꿔 둠) + rev */
 let server: { state: AppState; rev: number } | null = null;
@@ -268,6 +271,12 @@ async function loadCouple() {
     setSignedOut();
     return;
   }
+  // 비번 재설정 메일 링크로 들어온 경우: 새 비밀번호부터 정하게
+  if (recovering) {
+    session = { status: "recovery" };
+    emit();
+    return;
+  }
   const email = user.email ?? "";
   const { data: mine, error } = await sb.from("couple_members").select("couple_id, who").eq("user_id", user.id).maybeSingle();
   if (error) {
@@ -330,6 +339,7 @@ async function sync() {
 
 function setSignedOut() {
   session = { status: "signed-out" };
+  recovering = false;
   state = null;
   server = null;
   coupleId = null;
@@ -343,10 +353,16 @@ function setSignedOut() {
 function startRemote() {
   if (started) return;
   started = true;
+  // 클라이언트가 주소의 #...type=recovery 를 지우기 전에 확인
+  if (window.location.hash.includes("type=recovery")) recovering = true;
   const sb = supabase();
   sb.auth.onAuthStateChange((event, s) => {
     // 콜백 안에서 supabase 를 바로 await 하면 막힐 수 있어서 한 박자 뒤에
     if (!s) setTimeout(setSignedOut, 0);
+    else if (event === "PASSWORD_RECOVERY") {
+      recovering = true;
+      setTimeout(() => void loadCouple(), 0);
+    }
     else if (event === "INITIAL_SESSION" || event === "SIGNED_IN") setTimeout(() => void loadCouple(), 0);
   });
   // 폰은 백그라운드에서 실시간 연결이 끊기므로 돌아오면 한 번 맞춘다
@@ -373,6 +389,21 @@ export async function signUp(email: string, password: string): Promise<SaveResul
   return { ok: true, needsConfirm: !data.session };
 }
 
+/** 비밀번호 재설정 메일 보내기. 링크를 누르면 이 앱으로 돌아와 새 비밀번호를 정한다 */
+export async function sendPasswordReset(email: string): Promise<SaveResult> {
+  const { error } = await supabase().auth.resetPasswordForEmail(email, { redirectTo: window.location.origin });
+  return error ? { ok: false, error: friendly(error.message) } : { ok: true };
+}
+
+/** 재설정 링크로 들어온 뒤 새 비밀번호 저장 */
+export async function setNewPassword(password: string): Promise<SaveResult> {
+  const { error } = await supabase().auth.updateUser({ password });
+  if (error) return { ok: false, error: friendly(error.message) };
+  recovering = false;
+  await loadCouple();
+  return { ok: true };
+}
+
 export async function signOut() {
   await supabase().auth.signOut();
 }
@@ -392,6 +423,7 @@ function friendly(msg: string): string {
   if (msg.includes("Email not confirmed")) return "메일함에서 인증 링크를 먼저 눌러 주세요.";
   if (msg.includes("already registered")) return "이미 가입된 이메일이에요. 로그인해 주세요.";
   if (msg.includes("Password should be")) return "비밀번호는 6자 이상이어야 해요.";
+  if (msg.includes("different from the old")) return "예전과 다른 비밀번호로 정해 주세요.";
   if (msg.includes("rate limit")) return "잠깐 너무 많이 시도했어요. 조금 뒤에 다시 해 주세요.";
   if (msg.includes("Failed to fetch")) return "인터넷 연결을 확인해 주세요.";
   return `문제가 생겼어요: ${msg}`;

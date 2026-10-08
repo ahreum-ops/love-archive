@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { clearSyncError, useAppState, useSession, useSyncError } from "@/lib/store";
 import { REMOTE } from "@/lib/supabase";
-import Login from "./login";
+import Login, { ResetPassword } from "./login";
 import Setup from "./setup";
 import { Banner } from "./ui";
 
@@ -28,7 +28,9 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const gate = REMOTE
     ? session.status === "signed-out"
       ? <Login />
-      : session.status === "no-couple"
+      : session.status === "recovery"
+        ? <ResetPassword />
+        : session.status === "no-couple"
         ? <Setup />
         : null
     : state?.profile === null
