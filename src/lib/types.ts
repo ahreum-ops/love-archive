@@ -7,6 +7,8 @@ export type Profile = {
   startDate: string;
   /** 지금 이 기기를 쓰는 사람 */
   me: Who;
+  /** 홈에 크게 보이는 커플 사진 (압축된 data URL) */
+  photo?: string;
 };
 
 export type Anniversary = {

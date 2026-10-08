@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import CoupleHero from "@/components/couple-hero";
 import { Card } from "@/components/ui";
 import SettingsSheet from "@/components/settings-sheet";
 import WhoSwitch from "@/components/who-switch";
@@ -40,20 +41,7 @@ export default function Home() {
         </button>
       </div>
 
-      {/* D-day */}
-      <div className="relative overflow-hidden rounded-[36px] bg-gradient-to-br from-blush via-white to-lilac px-6 pb-7 pt-8 text-center shadow-pop ring-1 ring-white">
-        <div className="flex items-center justify-center gap-3 font-cute text-lg text-ink">
-          <span>{profile.names.a}</span>
-          <span className="animate-float text-2xl">💗</span>
-          <span>{profile.names.b}</span>
-        </div>
-        <p className="mt-4 text-sm text-ink-soft">우리가 함께한 지</p>
-        <p className="font-cute text-6xl leading-tight text-rose">
-          {days.toLocaleString()}
-          <span className="ml-1 text-2xl">일째</span>
-        </p>
-        <p className="mt-2 text-xs text-ink-soft">{formatDate(profile.startDate)} 부터</p>
-      </div>
+      <CoupleHero profile={profile} days={days} />
 
       {/* 다가오는 기념일 */}
       <Card>
