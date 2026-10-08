@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { PAPERS, paperOf } from "@/lib/content";
 import { addDays, formatDate, today } from "@/lib/dates";
 import { josa } from "@/lib/josa";
 import { isLocked } from "@/lib/letters";
 import { uid, update, useAppState } from "@/lib/store";
 import type { Letter } from "@/lib/types";
-import { LetterPaper, penText } from "./letter-paper";
+import { AutoTextarea, LetterPaper, penText } from "./letter-paper";
 import { Banner, Button, inputClass } from "./ui";
 
 /** 편지 쓰기 */
@@ -21,6 +21,7 @@ export function WriteLetter({ onDone, onSent }: { onDone: () => void; onSent: ()
   const [useOpenAt, setUseOpenAt] = useState(false);
   const [openAt, setOpenAt] = useState(addDays(today(), 7));
   const [sent, setSent] = useState(false);
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
   const [error, setError] = useState<string | null>(null);
 
   const tomorrow = addDays(today(), 1);
@@ -80,20 +81,30 @@ export function WriteLetter({ onDone, onSent }: { onDone: () => void; onSent: ()
 
       <LetterPaper paper={paper}>
         <p className={`${penText} text-rose`}>To. {p.names[partner]}</p>
-        <input
+        {/* 제목: 길면 자동 줄바꿈, 엔터는 본문으로 이동 */}
+        <AutoTextarea
           value={title}
-          onChange={(e) => setTitle(e.target.value)}
+          onChange={(e) => setTitle(e.target.value.replace(/\n/g, " "))}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+              e.preventDefault();
+              bodyRef.current?.focus();
+            }
+          }}
+          enterKeyHint="next"
           placeholder="제목 (선택)"
-          maxLength={30}
-          className={`${penText} w-full bg-transparent outline-none placeholder:text-ink/30`}
+          maxLength={40}
+          className={`${penText} font-bold`}
         />
-        <textarea
+        <AutoTextarea
+          ref={bodyRef}
           autoFocus
+          minLines={8}
           value={body}
           onChange={(e) => setBody(e.target.value)}
-          placeholder="하고 싶은 말을 마음껏 써주세요. 글자 수 제한은 없어요."
-          className={`${penText} min-h-[272px] w-full resize-none bg-transparent outline-none placeholder:text-ink/30`}
-          style={{ fieldSizing: "content" } as React.CSSProperties}
+          enterKeyHint="enter"
+          placeholder="하고 싶은 말을 마음껏 써주세요. 엔터로 줄을 바꿀 수 있고, 글자 수 제한은 없어요."
+          className={penText}
         />
         <p className={`${penText} text-right`}>From. {p.names[p.me]}</p>
       </LetterPaper>
