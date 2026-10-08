@@ -81,6 +81,11 @@ do $$ begin
   alter publication supabase_realtime add table public.couples;
 exception when duplicate_object then null; end $$;
 
+-- 연인이 초대 코드로 들어오면 만든 사람 화면에도 바로 반영
+do $$ begin
+  alter publication supabase_realtime add table public.couple_members;
+exception when duplicate_object then null; end $$;
+
 -- 사진: photos 버킷, 경로 = <couple_id>/<랜덤>.jpg
 -- 공개 버킷이라 URL 을 아는 사람은 볼 수 있다 (URL 은 추측 불가능한 랜덤). 올리기·지우기는 커플 본인만.
 insert into storage.buckets (id, name, public)
