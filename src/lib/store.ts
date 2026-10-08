@@ -8,6 +8,7 @@
 
 import { useSyncExternalStore } from "react";
 import { DEFAULT_BUCKET } from "./content";
+import { notifyPartner, refreshPush } from "./push";
 import { REMOTE, supabase } from "./supabase";
 import type { AppState, Profile, Who } from "./types";
 
@@ -207,6 +208,7 @@ async function flush() {
         if (error) throw error;
         if (typeof data === "number") {
           server = { state: next, rev: data };
+          if (session.status === "ready" && session.partnerJoined) void notifyPartner(base, next, session.who);
           break;
         }
         // 상대가 먼저 저장함 → 최신을 받아 다시
@@ -301,6 +303,7 @@ async function loadCouple() {
   server = { state: withMe(couple.state as AppState), rev: couple.rev };
   recompute();
   listen();
+  void refreshPush();
 }
 
 /** 상대가 저장하거나 들어오면 바로 다시 받기 */

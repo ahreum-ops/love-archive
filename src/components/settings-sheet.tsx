@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { today } from "@/lib/dates";
+import { disablePush, enablePush, pushStatus, type PushStatus } from "@/lib/push";
 import { resetAll, signOut, update, useAppState, useSession } from "@/lib/store";
 import { REMOTE } from "@/lib/supabase";
 import { Banner, Button, Field, Sheet, inputClass } from "./ui";
@@ -57,6 +58,8 @@ function SettingsForm({ onClose }: { onClose: () => void }) {
               <p className="mt-3 text-center font-cute text-3xl tracking-[0.3em] text-rose">{session.inviteCode}</p>
               <p className="mt-3 text-xs">로그인: {session.email}</p>
             </div>
+            <PushToggle />
+
             <button onClick={() => void signOut()} className="w-full py-2 text-center text-sm text-ink-soft underline-offset-2 hover:underline">
               로그아웃
             </button>
@@ -98,5 +101,69 @@ function TrialReset() {
         </button>
       )}
     </>
+  );
+}
+
+/** 이 기기에서 푸시 알림 받기 (기기마다 따로 켠다) */
+function PushToggle() {
+  const [status, setStatus] = useState<PushStatus | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const names = useAppState()!.profile!.names;
+  const session = useSession();
+  const other = session.status === "ready" ? names[session.who === "a" ? "b" : "a"] : "연인";
+
+  useEffect(() => {
+    let alive = true;
+    pushStatus()
+      .then((s) => alive && setStatus(s))
+      .catch((e) => {
+        console.error("[push] status failed", e);
+        if (alive) setStatus("off");
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  async function toggle() {
+    setBusy(true);
+    const r = status === "on" ? await disablePush() : await enablePush();
+    setBusy(false);
+    if (!r.ok) setError(r.error);
+    setStatus(await pushStatus().catch(() => status));
+  }
+
+  if (status === null) return null;
+  return (
+    <div className="rounded-2xl bg-cream p-4 text-sm text-ink-soft">
+      <Banner message={error} onClose={() => setError(null)} />
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="font-cute text-ink">이 기기로 알림 받기 🔔</p>
+          <p className="mt-1 text-xs">
+            {status === "on"
+              ? `${other}님이 편지·버킷리스트·장소를 남기면 알려 드려요`
+              : status === "denied"
+                ? "알림이 차단돼 있어요. 주소창 왼쪽 자물쇠 → 권한 → 알림을 ‘허용’으로 바꾼 뒤 새로고침해 주세요."
+                : status === "unsupported"
+                  ? "이 브라우저는 알림을 지원하지 않아요. 크롬이나 삼성 인터넷으로 열어 주세요."
+                  : "앱을 닫아 둬도 휴대폰 알림으로 받아요"}
+          </p>
+        </div>
+        {(status === "on" || status === "off") && (
+          <button
+            role="switch"
+            aria-checked={status === "on"}
+            aria-label="알림 받기"
+            disabled={busy}
+            onClick={() => void toggle()}
+            className={`press relative h-7 w-12 shrink-0 rounded-full transition-colors disabled:opacity-50 ${status === "on" ? "bg-rose" : "bg-line"}`}
+          >
+            <span className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-all ${status === "on" ? "left-6" : "left-1"}`} />
+          </button>
+        )}
+      </div>
+    </div>
   );
 }

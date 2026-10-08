@@ -101,3 +101,39 @@ drop policy if exists "couple deletes photos" on storage.objects;
 create policy "couple deletes photos" on storage.objects
   for delete to authenticated
   using (bucket_id = 'photos' and (storage.foldername(name))[1] = public.my_couple_id()::text);
+
+-- 푸시 알림: 기기(브라우저)마다 구독 하나. 상대가 뭘 하면 /api/push 가 내 구독들로 보낸다.
+-- 같은 커플이면 서로의 구독을 읽을 수 있다 (상대에게 보내려고). 저장은 아래 함수로만.
+create table if not exists public.push_subscriptions (
+  endpoint text primary key,
+  user_id uuid not null references auth.users on delete cascade,
+  couple_id uuid not null references public.couples on delete cascade,
+  p256dh text not null,
+  auth text not null,
+  created_at timestamptz not null default now()
+);
+
+alter table public.push_subscriptions enable row level security;
+
+drop policy if exists "read couple subscriptions" on public.push_subscriptions;
+create policy "read couple subscriptions" on public.push_subscriptions
+  for select to authenticated using (couple_id = public.my_couple_id());
+
+-- 끄기 · 만료된 구독 정리
+drop policy if exists "delete couple subscriptions" on public.push_subscriptions;
+create policy "delete couple subscriptions" on public.push_subscriptions
+  for delete to authenticated using (couple_id = public.my_couple_id());
+
+-- 같은 기기로 다른 계정이 로그인해도 마지막 사람 것으로 바뀐다
+create or replace function public.save_push_subscription(sub_endpoint text, sub_p256dh text, sub_auth text) returns void
+language plpgsql security definer set search_path = '' as $$
+begin
+  if public.my_couple_id() is null then raise exception 'no_couple'; end if;
+  insert into public.push_subscriptions (endpoint, user_id, couple_id, p256dh, auth)
+  values (sub_endpoint, auth.uid(), public.my_couple_id(), sub_p256dh, sub_auth)
+  on conflict on constraint push_subscriptions_pkey do update
+    set user_id = excluded.user_id, couple_id = excluded.couple_id, p256dh = excluded.p256dh, auth = excluded.auth;
+end $$;
+
+revoke execute on function public.save_push_subscription(text, text, text) from anon, public;
+grant execute on function public.save_push_subscription(text, text, text) to authenticated;
