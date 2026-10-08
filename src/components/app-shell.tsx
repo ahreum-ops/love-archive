@@ -9,6 +9,7 @@ import Setup from "./setup";
 const TABS = [
   { href: "/", label: "홈", icon: HomeIcon },
   { href: "/bucket", label: "버킷리스트", icon: StarIcon },
+  { href: "/places", label: "장소", icon: PinIcon },
   { href: "/letters", label: "편지", icon: MailIcon },
   { href: "/play", label: "놀이", icon: GameIcon },
   { href: "/days", label: "기념일", icon: CalIcon },
@@ -38,7 +39,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
                   <Link
                     key={href}
                     href={href}
-                    className={`press flex flex-1 flex-col items-center gap-0.5 rounded-[20px] py-2 text-[11px] ${
+                    className={`press flex min-w-0 flex-1 flex-col items-center gap-0.5 whitespace-nowrap rounded-[20px] py-2 text-[11px] tracking-tight ${
                       active ? "bg-blush text-rose" : "text-ink-soft"
                     }`}
                   >
@@ -122,6 +123,14 @@ function CalIcon({ active }: IconProps) {
     <svg width="24" height="24" viewBox="0 0 24 24" {...stroke(active)}>
       <rect x="4" y="5.5" width="16" height="14" rx="4" />
       <path d="M8 3.5v4M16 3.5v4M4 10h16" />
+    </svg>
+  );
+}
+function PinIcon({ active }: IconProps) {
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" {...stroke(active)}>
+      <path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z" />
+      <circle cx="12" cy="10" r="2.3" />
     </svg>
   );
 }

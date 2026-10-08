@@ -87,3 +87,49 @@ body {
 .scrollbar-none::-webkit-scrollbar {
   display: none;
 }
+
+/* 지도 핀 (place-map.tsx 의 divIcon) */
+.place-pin {
+  position: relative;
+  display: flex;
+  width: 38px;
+  height: 38px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50% 50% 50% 4px;
+  transform: rotate(-45deg);
+  background: var(--pin, var(--color-blush));
+  border: 3px solid #fff;
+  box-shadow: 0 6px 14px -4px rgb(232 100 140 / 0.45);
+  transition: transform 0.2s ease;
+}
+.place-pin > span {
+  transform: rotate(45deg);
+  font-size: 18px;
+  line-height: 1;
+}
+.place-pin.is-selected {
+  border-color: var(--color-rose);
+  transform: rotate(-45deg) scale(1.2);
+}
+.place-pin.is-pick {
+  width: 44px;
+  height: 44px;
+  background: var(--color-pink);
+  animation: pin-bob 1.6s ease-in-out infinite;
+}
+.leaflet-container {
+  font-family: var(--font-sans);
+}
+.leaflet-control-attribution {
+  font-size: 9px;
+  background: rgb(255 255 255 / 0.7) !important;
+}
+@keyframes pin-bob {
+  0%, 100% { transform: translateY(0) rotate(-45deg); }
+  50% { transform: translateY(-6px) rotate(-45deg); }
+}
+/* OSM 기본 지도를 앱 색감에 맞게 살짝 흐리게 */
+.leaflet-tile-pane {
+  filter: saturate(0.7) brightness(1.04) contrast(0.92);
+}

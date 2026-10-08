@@ -74,6 +74,32 @@ export type CatAction = "feed" | "water" | "clean" | "pet" | "checkin";
 
 export type CatLog = { at: number; by: Who; catId?: string; action: CatAction; xp: number };
 
+/** 한 사람이 남긴 장소 후기 */
+export type PlaceReview = {
+  /** 1 ~ 5 (0.5 단위) */
+  stars: number;
+  comment?: string;
+  /** 또 가고 싶어 */
+  again?: boolean;
+};
+
+/** 함께 간 곳 */
+export type Place = {
+  id: string;
+  name: string;
+  /** PLACE_CATEGORIES 의 id */
+  category: string;
+  lat: number;
+  lng: number;
+  address?: string;
+  /** 간 날 (YYYY-MM-DD) */
+  visitedAt: string;
+  reviews: Partial<Record<Who, PlaceReview>>;
+  /** 그날 사진 (압축된 data URL) */
+  photo?: string;
+  createdBy: Who;
+};
+
 export type Answers<T> = Record<string, Partial<Record<Who, T>>>;
 
 export type AppState = {
@@ -91,4 +117,5 @@ export type AppState = {
   catCheckin: Partial<Record<Who, { date: string; streak: number }>>;
   /** 최근 돌봄 기록 (최신이 앞) */
   catLog: CatLog[];
+  places: Place[];
 };

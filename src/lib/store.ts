@@ -20,6 +20,7 @@ const EMPTY: AppState = {
   cats: [],
   catCheckin: {},
   catLog: [],
+  places: [],
 };
 
 let state: AppState | null = null;
