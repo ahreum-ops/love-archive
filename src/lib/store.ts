@@ -16,6 +16,7 @@ const EMPTY: AppState = {
   bucket: [],
   balance: {},
   survey: {},
+  letters: [],
 };
 
 let state: AppState | null = null;

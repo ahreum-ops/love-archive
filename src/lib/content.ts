@@ -132,3 +132,16 @@ export const SURVEY: SurveyQuestion[] = [
 ];
 
 export const PASTELS = ["bg-blush", "bg-lilac", "bg-peach", "bg-mint", "bg-sky", "bg-lemon"] as const;
+
+/** 편지지: 바탕색 · 줄 색 · 봉투 색 */
+export const PAPERS = [
+  { id: "pink", name: "벚꽃", bg: "#fff1f5", line: "#ffd0dd", envelope: "#ffc2d3", deco: "🌸" },
+  { id: "lilac", name: "라벤더", bg: "#f6f1ff", line: "#e0d3ff", envelope: "#d7c6ff", deco: "💜" },
+  { id: "mint", name: "민트", bg: "#effbf5", line: "#c9efdc", envelope: "#bfe9d4", deco: "🍀" },
+  { id: "lemon", name: "레몬", bg: "#fffbe8", line: "#fbeeb0", envelope: "#fde79a", deco: "🌼" },
+  { id: "sky", name: "하늘", bg: "#f0f7ff", line: "#cfe4fb", envelope: "#c3dcf8", deco: "☁️" },
+] as const;
+
+export function paperOf(id: string) {
+  return PAPERS.find((p) => p.id === id) ?? PAPERS[0];
+}

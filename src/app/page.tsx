@@ -8,13 +8,18 @@ import SettingsSheet from "@/components/settings-sheet";
 import WhoSwitch from "@/components/who-switch";
 import { BALANCE } from "@/lib/content";
 import { dayCount, dLabel, formatDate, upcoming } from "@/lib/dates";
+import { josa } from "@/lib/josa";
+import { isLocked } from "@/lib/letters";
 import { useAppState } from "@/lib/store";
 
 export default function Home() {
   const state = useAppState();
   const [settings, setSettings] = useState(false);
   if (!state?.profile) return null;
-  const { profile, bucket, anniversaries, balance } = state;
+  const { profile, bucket, anniversaries, balance, letters } = state;
+  const partner = profile.me === "a" ? "b" : "a";
+  const unread = letters.filter((l) => l.from !== profile.me && !l.readAt && !isLocked(l)).length;
+  const waiting = letters.filter((l) => l.from !== profile.me && isLocked(l)).length;
 
   const days = dayCount(profile.startDate);
   const next = upcoming(profile.startDate, anniversaries).slice(0, 3);
@@ -42,6 +47,20 @@ export default function Home() {
       </div>
 
       <CoupleHero profile={profile} days={days} />
+
+      {(unread > 0 || waiting > 0) && (
+        <Link href="/letters" className="press flex items-center gap-3 rounded-[24px] bg-gradient-to-r from-pink to-violet px-5 py-4 text-white shadow-pop">
+          <span className="animate-float text-3xl">{unread > 0 ? "💌" : "🔒"}</span>
+          <div className="flex-1">
+            <p className="font-cute text-lg">
+              {unread > 0
+                ? `${josa(profile.names[partner], "이", "가")} 보낸 편지가 ${unread}통 왔어요`
+                : `열어볼 날을 기다리는 편지가 ${waiting}통 있어요`}
+            </p>
+            <p className="text-xs opacity-90">{unread > 0 ? "지금 열어보기 ›" : "편지함에서 남은 날을 확인해요 ›"}</p>
+          </div>
+        </Link>
+      )}
 
       {/* 다가오는 기념일 */}
       <Card>

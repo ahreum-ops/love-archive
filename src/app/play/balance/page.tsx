@@ -28,11 +28,22 @@ export default function BalancePage() {
   const answeredCount = BALANCE.filter((x) => balance[x.id]?.[me] !== undefined).length;
   const partnerWaiting = BALANCE.filter((x) => balance[x.id]?.[partner] !== undefined && balance[x.id]?.[me] === undefined).length;
 
+  // 같은 쪽을 다시 누르면 취소, 다른 쪽을 누르면 바꾸기
   function choose(side: 0 | 1) {
-    if (!q || mine !== undefined) return;
+    if (!q) return;
     setCurrentId(q.id);
-    const r = update((s) => ({ ...s, balance: { ...s.balance, [q.id]: { ...s.balance[q.id], [me]: side } } }));
+    const r = update((s) => {
+      const row = { ...s.balance[q.id] };
+      if (row[me] === side) delete row[me];
+      else row[me] = side;
+      return { ...s, balance: { ...s.balance, [q.id]: row } };
+    });
     if (!r.ok) setError(r.error);
+  }
+
+  function goTo(id: string) {
+    setCurrentId(id);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   function next() {
@@ -74,7 +85,7 @@ export default function BalancePage() {
                 <button
                   key={side}
                   onClick={() => choose(side)}
-                  disabled={mine !== undefined}
+                  aria-pressed={iPicked}
                   className={`press relative flex min-h-24 w-full flex-col items-center justify-center rounded-[26px] px-4 py-5 text-center transition-all ${
                     iPicked
                       ? "bg-gradient-to-br from-pink to-rose text-white shadow-soft"
@@ -113,7 +124,8 @@ export default function BalancePage() {
                   {names[partner]}도 고르면 결과가 공개돼요.
                 </p>
               )}
-              <Button onClick={next} variant="soft" className="mt-4">
+              <p className="mt-2 text-xs text-ink-soft/80">고른 걸 다시 누르면 취소, 반대쪽을 누르면 바꿀 수 있어요</p>
+              <Button onClick={next} variant="soft" className="mt-3">
                 다음 질문 ›
               </Button>
             </div>
@@ -139,7 +151,7 @@ export default function BalancePage() {
               const r = balance[x.id]!;
               const same = r.a === r.b;
               return (
-                <li key={x.id} className="flex items-center gap-3 rounded-2xl bg-white/85 px-4 py-3 shadow-soft ring-1 ring-line">
+                <li key={x.id} onClick={() => goTo(x.id)} className="press flex cursor-pointer items-center gap-3 rounded-2xl bg-white/85 px-4 py-3 shadow-soft ring-1 ring-line">
                   <span className="text-lg">{same ? "💕" : "🤔"}</span>
                   <div className="flex-1 text-sm">
                     <p>

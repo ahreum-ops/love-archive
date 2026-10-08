@@ -9,6 +9,7 @@ import Setup from "./setup";
 const TABS = [
   { href: "/", label: "홈", icon: HomeIcon },
   { href: "/bucket", label: "버킷리스트", icon: StarIcon },
+  { href: "/letters", label: "편지", icon: MailIcon },
   { href: "/play", label: "놀이", icon: GameIcon },
   { href: "/days", label: "기념일", icon: CalIcon },
 ];
@@ -95,6 +96,14 @@ function StarIcon({ active }: IconProps) {
   return (
     <svg width="24" height="24" viewBox="0 0 24 24" {...stroke(active)}>
       <path d="M12 3.5l2.5 5.2 5.6.7-4.1 3.9 1 5.6-5-2.7-5 2.7 1-5.6-4.1-3.9 5.6-.7z" />
+    </svg>
+  );
+}
+function MailIcon({ active }: IconProps) {
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" {...stroke(active)}>
+      <rect x="3.5" y="6" width="17" height="12.5" rx="3.5" />
+      <path d="M4.5 7.5l7.5 5.5 7.5-5.5" />
     </svg>
   );
 }

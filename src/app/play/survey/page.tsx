@@ -25,7 +25,13 @@ export default function SurveyPage() {
   const questions = SURVEY.filter((q) => q.category === cat);
 
   function choose(id: string, option: string) {
-    const r = update((s) => ({ ...s, survey: { ...s.survey, [id]: { ...s.survey[id], [me]: option } } }));
+    // 같은 답을 다시 누르면 취소
+    const r = update((s) => {
+      const row = { ...s.survey[id] };
+      if (row[me] === option) delete row[me];
+      else row[me] = option;
+      return { ...s, survey: { ...s.survey, [id]: row } };
+    });
     if (!r.ok) setError(r.error);
   }
 

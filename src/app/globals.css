@@ -18,6 +18,7 @@
 
   --font-sans: var(--font-gowun), system-ui, sans-serif;
   --font-cute: var(--font-jua), var(--font-gowun), sans-serif;
+  --font-pen: var(--font-pen-script), var(--font-gowun), cursive;
 
   --shadow-soft: 0 6px 24px -8px rgb(232 100 140 / 0.22);
   --shadow-pop: 0 10px 30px -10px rgb(169 139 240 / 0.45);

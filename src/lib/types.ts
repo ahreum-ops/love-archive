@@ -34,6 +34,21 @@ export type BucketItem = {
   photo?: string;
 };
 
+export type Letter = {
+  id: string;
+  from: Who;
+  title?: string;
+  body: string;
+  /** 편지지 id (PAPERS) */
+  paper: string;
+  /** 쓴 시각 (ISO) */
+  createdAt: string;
+  /** 이 날부터 열어볼 수 있음 (YYYY-MM-DD). 없으면 바로 */
+  openAt?: string;
+  /** 받는 사람이 처음 연 시각 (ISO) */
+  readAt?: string;
+};
+
 export type Answers<T> = Record<string, Partial<Record<Who, T>>>;
 
 export type AppState = {
@@ -45,4 +60,5 @@ export type AppState = {
   balance: Answers<0 | 1>;
   /** 취향 설문: 질문 id → 각자 고른 보기 */
   survey: Answers<string>;
+  letters: Letter[];
 };

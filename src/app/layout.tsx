@@ -1,10 +1,11 @@
 import type { Metadata, Viewport } from "next";
-import { Gowun_Dodum, Jua } from "next/font/google";
+import { Gowun_Dodum, Jua, Nanum_Pen_Script } from "next/font/google";
 import AppShell from "@/components/app-shell";
 import "./globals.css";
 
 const body = Gowun_Dodum({ weight: "400", variable: "--font-gowun", preload: false });
 const cute = Jua({ weight: "400", variable: "--font-jua", preload: false });
+const pen = Nanum_Pen_Script({ weight: "400", variable: "--font-pen-script", preload: false });
 
 export const metadata: Metadata = {
   title: "러브아카이브",
@@ -22,7 +23,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="ko" className={`${body.variable} ${cute.variable} h-full antialiased`}>
+    <html lang="ko" className={`${body.variable} ${cute.variable} ${pen.variable} h-full antialiased`}>
       <body className="min-h-full font-sans">
         <AppShell>{children}</AppShell>
       </body>
