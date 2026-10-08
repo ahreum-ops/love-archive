@@ -6,6 +6,7 @@ import { addDays, formatDate, today } from "@/lib/dates";
 import { josa } from "@/lib/josa";
 import { isLocked } from "@/lib/letters";
 import { uid, update, useAppState } from "@/lib/store";
+import { REMOTE } from "@/lib/supabase";
 import type { Letter } from "@/lib/types";
 import { AutoTextarea, LetterPaper, penText } from "./letter-paper";
 import { Banner, Button, inputClass } from "./ui";
@@ -51,9 +52,11 @@ export function WriteLetter({ onDone, onSent }: { onDone: () => void; onSent: ()
         <p className="mt-1 text-sm text-ink-soft">
           {useOpenAt ? `${formatDate(openAt)}에 ${josa(p.names[partner], "이", "가")} 열어볼 수 있어요.` : `${josa(p.names[partner], "이", "가")} 열면 ‘읽음’으로 바뀌어요.`}
         </p>
-        <p className="mt-4 rounded-2xl bg-lilac/60 px-4 py-3 text-xs text-ink-soft">
-          체험 모드: 위쪽 ‘지금 {p.names[p.me]} ⇄’ 버튼으로 {p.names[partner]} 시점으로 바꾸면 받은 편지를 볼 수 있어요.
-        </p>
+        {!REMOTE && (
+          <p className="mt-4 rounded-2xl bg-lilac/60 px-4 py-3 text-xs text-ink-soft">
+            체험 모드: 위쪽 ‘지금 {p.names[p.me]} ⇄’ 버튼으로 {p.names[partner]} 시점으로 바꾸면 받은 편지를 볼 수 있어요.
+          </p>
+        )}
         <Button onClick={onDone} className="mt-6">
           닫기
         </Button>

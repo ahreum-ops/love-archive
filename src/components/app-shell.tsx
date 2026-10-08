@@ -3,8 +3,11 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
-import { useAppState } from "@/lib/store";
+import { clearSyncError, useAppState, useSession, useSyncError } from "@/lib/store";
+import { REMOTE } from "@/lib/supabase";
+import Login from "./login";
 import Setup from "./setup";
+import { Banner } from "./ui";
 
 const TABS = [
   { href: "/", label: "홈", icon: HomeIcon },
@@ -17,14 +20,26 @@ const TABS = [
 
 export default function AppShell({ children }: { children: ReactNode }) {
   const state = useAppState();
+  const session = useSession();
+  const syncError = useSyncError();
   const pathname = usePathname();
+
+  // 서버 모드: 로그인 → 커플 만들기/코드로 들어가기. 체험 모드: 프로필이 없으면 바로 만들기
+  const gate = REMOTE
+    ? session.status === "signed-out"
+      ? <Login />
+      : session.status === "no-couple"
+        ? <Setup />
+        : null
+    : state?.profile === null
+      ? <Setup />
+      : null;
 
   return (
     <div className="relative mx-auto min-h-dvh w-full max-w-md overflow-x-hidden">
       <Blobs />
-      {state?.profile === null ? (
-        <Setup />
-      ) : (
+      <Banner message={syncError} onClose={clearSyncError} />
+      {gate ?? (
         <>
           {/* 서버 렌더링 때도 페이지를 그려야 하므로 children 은 항상 둔다 (데이터가 없으면 각 페이지가 비워 둠) */}
           <main className="relative px-4 pb-[calc(env(safe-area-inset-bottom)+96px)] pt-[calc(env(safe-area-inset-top)+16px)]">

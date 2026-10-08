@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { today } from "@/lib/dates";
-import { resetAll, update, useAppState } from "@/lib/store";
+import { resetAll, signOut, update, useAppState, useSession } from "@/lib/store";
+import { REMOTE } from "@/lib/supabase";
 import { Banner, Button, Field, Sheet, inputClass } from "./ui";
 
 export default function SettingsSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -16,11 +17,11 @@ export default function SettingsSheet({ open, onClose }: { open: boolean; onClos
 
 function SettingsForm({ onClose }: { onClose: () => void }) {
   const state = useAppState()!;
+  const session = useSession();
   const p = state.profile!;
   const [a, setA] = useState(p.names.a);
   const [b, setB] = useState(p.names.b);
   const [start, setStart] = useState(p.startDate);
-  const [confirmReset, setConfirmReset] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const valid = a.trim() && b.trim() && start && start <= today();
@@ -47,6 +48,31 @@ function SettingsForm({ onClose }: { onClose: () => void }) {
         저장
       </Button>
 
+      {REMOTE ? (
+        session.status === "ready" && (
+          <>
+            <div className="rounded-2xl bg-cream p-4 text-sm text-ink-soft">
+              <p className="font-cute text-ink">{session.partnerJoined ? "함께 쓰는 중 💞" : "연인 초대하기"}</p>
+              {!session.partnerJoined && <p className="mt-1">연인이 앱에 가입한 뒤 ‘초대 코드가 있어요’에 이 코드를 넣으면 연결돼요.</p>}
+              <p className="mt-3 text-center font-cute text-3xl tracking-[0.3em] text-rose">{session.inviteCode}</p>
+              <p className="mt-3 text-xs">로그인: {session.email}</p>
+            </div>
+            <button onClick={() => void signOut()} className="w-full py-2 text-center text-sm text-ink-soft underline-offset-2 hover:underline">
+              로그아웃
+            </button>
+          </>
+        )
+      ) : (
+        <TrialReset />
+      )}
+    </div>
+  );
+}
+
+function TrialReset() {
+  const [confirmReset, setConfirmReset] = useState(false);
+  return (
+    <>
       <div className="rounded-2xl bg-cream p-4 text-sm text-ink-soft">
         <p className="font-cute text-ink">체험 모드</p>
         <p className="mt-1">
@@ -71,6 +97,6 @@ function SettingsForm({ onClose }: { onClose: () => void }) {
           처음부터 다시 시작하기
         </button>
       )}
-    </div>
+    </>
   );
 }

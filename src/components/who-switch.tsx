@@ -1,6 +1,7 @@
 "use client";
 
 import { update, useAppState } from "@/lib/store";
+import { REMOTE } from "@/lib/supabase";
 
 /**
  * 체험 모드 전용: 한 기기에서 두 사람 역할을 번갈아 해볼 수 있게 '지금 누구인지'를 바꾼다.
@@ -9,7 +10,7 @@ import { update, useAppState } from "@/lib/store";
 export default function WhoSwitch() {
   const state = useAppState();
   const p = state?.profile;
-  if (!p) return null;
+  if (!p || REMOTE) return null;
   const other = p.me === "a" ? "b" : "a";
   return (
     <button
