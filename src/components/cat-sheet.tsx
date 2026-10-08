@@ -64,9 +64,18 @@ function CatCare({ catId }: { catId: string }) {
       <Banner message={error} onClose={() => setError(null)} />
 
       <div className="relative flex flex-col items-center">
-        <div className="animate-breathe" style={{ transformOrigin: "50% 100%" }}>
-          <CatSprite look={cat.look} baby={stage.index < 2} mood={mood} size={Math.round(150 * (0.75 + stage.scale / 4))} />
-        </div>
+        {/* 누르면 손 들어서 젤리 보여주기 */}
+        <button
+          onClick={() => {
+            setMood("happy");
+            setTimeout(() => setMood("idle"), 1500);
+          }}
+          className="animate-breathe"
+          style={{ transformOrigin: "50% 100%" }}
+          aria-label="젤리 보기"
+        >
+          <CatSprite look={cat.look} baby={stage.index < 2} mood={mood} size={Math.round(60 + 80 * stage.scale)} />
+        </button>
         {pop && (
           <span key={pop.key} className="pointer-events-none absolute top-6 animate-rise font-cute text-xl text-rose">
             {pop.text}

@@ -60,9 +60,9 @@ export function levelInfo(xp: number) {
 }
 
 export const STAGES = [
-  { from: 1, label: "아기 고양이", emoji: "🍼", scale: 0.62 },
-  { from: 4, label: "꼬마 고양이", emoji: "🧶", scale: 0.76 },
-  { from: 8, label: "청소년 고양이", emoji: "🎀", scale: 0.88 },
+  { from: 1, label: "아기 고양이", emoji: "🍼", scale: 0.5 },
+  { from: 4, label: "꼬마 고양이", emoji: "🧶", scale: 0.66 },
+  { from: 8, label: "청소년 고양이", emoji: "🎀", scale: 0.84 },
   { from: 12, label: "어른 고양이", emoji: "👑", scale: 1 },
 ] as const;
 
