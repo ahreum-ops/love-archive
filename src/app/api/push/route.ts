@@ -12,7 +12,18 @@ export async function POST(req: Request) {
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   const vapidPublic = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
   const vapidPrivate = process.env.VAPID_PRIVATE_KEY;
-  if (!url || !anon || !vapidPublic || !vapidPrivate) return Response.json({ error: "push_not_configured" }, { status: 501 });
+  if (!url || !anon || !vapidPublic || !vapidPrivate) {
+    // 값은 숨기고 어떤 환경 변수가 비었는지만 알려 준다 (Vercel 설정 확인용)
+    const missing = Object.entries({
+      NEXT_PUBLIC_SUPABASE_URL: url,
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: anon,
+      NEXT_PUBLIC_VAPID_PUBLIC_KEY: vapidPublic,
+      VAPID_PRIVATE_KEY: vapidPrivate,
+    })
+      .filter(([, v]) => !v)
+      .map(([k]) => k);
+    return Response.json({ error: "push_not_configured", missing }, { status: 501 });
+  }
 
   const token = req.headers.get("authorization")?.replace(/^Bearer /, "");
   if (!token) return Response.json({ error: "not_signed_in" }, { status: 401 });
