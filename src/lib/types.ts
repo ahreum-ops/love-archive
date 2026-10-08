@@ -49,6 +49,31 @@ export type Letter = {
   readAt?: string;
 };
 
+/** 우리집 고양이 생김새: tabby = 고등어+흰 블레이즈, patch = 흰 바탕에 귀·등 얼룩 */
+export type CatLook = "tabby" | "patch";
+
+export type Cat = {
+  id: string;
+  name: string;
+  look: CatLook;
+  xp: number;
+  /** 0 ~ 100 */
+  affection: number;
+  /** 마지막으로 밥 · 물 · 화장실 챙긴 시각 (epoch ms). 지금과의 차이로 배고픔 등을 계산 */
+  fedAt: number;
+  wateredAt: number;
+  cleanedAt: number;
+  /** 오늘 쓰다듬은 횟수 (하루 제한) */
+  petDay?: string;
+  petCount?: number;
+  /** 데려온 날 (YYYY-MM-DD) */
+  adoptedAt: string;
+};
+
+export type CatAction = "feed" | "water" | "clean" | "pet" | "checkin";
+
+export type CatLog = { at: number; by: Who; catId?: string; action: CatAction; xp: number };
+
 export type Answers<T> = Record<string, Partial<Record<Who, T>>>;
 
 export type AppState = {
@@ -61,4 +86,9 @@ export type AppState = {
   /** 취향 설문: 질문 id → 각자 고른 보기 */
   survey: Answers<string>;
   letters: Letter[];
+  cats: Cat[];
+  /** 사람별 마지막 출석일 + 연속 출석 */
+  catCheckin: Partial<Record<Who, { date: string; streak: number }>>;
+  /** 최근 돌봄 기록 (최신이 앞) */
+  catLog: CatLog[];
 };

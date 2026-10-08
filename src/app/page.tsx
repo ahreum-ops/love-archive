@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import CatRoom from "@/components/cat-room";
 import CoupleHero from "@/components/couple-hero";
 import { Card } from "@/components/ui";
 import SettingsSheet from "@/components/settings-sheet";
@@ -47,6 +48,8 @@ export default function Home() {
       </div>
 
       <CoupleHero profile={profile} days={days} />
+
+      <CatRoom state={state} />
 
       {(unread > 0 || waiting > 0) && (
         <Link href="/letters" className="press flex items-center gap-3 rounded-[24px] bg-gradient-to-r from-pink to-violet px-5 py-4 text-white shadow-pop">

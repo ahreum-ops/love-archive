@@ -17,6 +17,9 @@ const EMPTY: AppState = {
   balance: {},
   survey: {},
   letters: [],
+  cats: [],
+  catCheckin: {},
+  catLog: [],
 };
 
 let state: AppState | null = null;
