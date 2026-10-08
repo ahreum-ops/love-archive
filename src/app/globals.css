@@ -1,26 +1,71 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/* 파스텔 몽글 팔레트 */
+@theme {
+  --color-cream: #fff9f5;
+  --color-blush: #ffe0e9;
+  --color-pink: #ffb3c7;
+  --color-rose: #e8648c;
+  --color-lilac: #ebe2ff;
+  --color-violet: #a98bf0;
+  --color-peach: #ffe8d6;
+  --color-mint: #dcf5ea;
+  --color-sky: #ddeeff;
+  --color-lemon: #fff6cc;
+  --color-ink: #5b4760;
+  --color-ink-soft: #9b8a9f;
+  --color-line: #f3e6ec;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  --font-sans: var(--font-gowun), system-ui, sans-serif;
+  --font-cute: var(--font-jua), var(--font-gowun), sans-serif;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  --shadow-soft: 0 6px 24px -8px rgb(232 100 140 / 0.22);
+  --shadow-pop: 0 10px 30px -10px rgb(169 139 240 / 0.45);
+
+  --animate-pop: pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+  --animate-float: float 6s ease-in-out infinite;
+  --animate-flip: flip 0.6s ease-out;
+
+  @keyframes pop {
+    0% { transform: scale(0.6); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+  }
+  @keyframes flip {
+    0% { transform: rotateY(90deg); opacity: 0; }
+    100% { transform: rotateY(0); opacity: 1; }
   }
 }
 
+:root {
+  color-scheme: light;
+}
+
+html,
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-cream);
+  color: var(--color-ink);
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  overscroll-behavior-y: none;
+}
+
+/* 버튼을 누를 때 살짝 눌리는 느낌 */
+.press {
+  transition: transform 0.15s ease;
+}
+.press:active {
+  transform: scale(0.96);
+}
+
+.scrollbar-none {
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
 }
