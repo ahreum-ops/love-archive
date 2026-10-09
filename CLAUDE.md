@@ -10,7 +10,7 @@
   - `profile.me` 는 공유 state 에 의미 없음 — 로그인한 사람의 `who`(a=만든 사람, b=초대 코드로 들어온 사람)로 덮어쓴다.
   - 체험 모드에선 `WhoSwitch` 로 한 기기에서 두 사람 역할을 번갈아 테스트한다 (서버 모드에선 숨김).
 - 콘텐츠(기본 버킷리스트·밸런스 질문·설문): `src/lib/content.ts`.
-- 우리의 장소: `src/lib/places.ts`. 지도는 Leaflet + OpenStreetMap 타일(키 없음), 검색·주소는 Nominatim — 이용 규칙(초당 1회) 때문에 검색 버튼 누를 때만 호출.
+- 우리의 장소: `src/lib/places.ts`. 지도·검색은 카카오맵(`src/lib/kakao.ts`, `NEXT_PUBLIC_KAKAO_MAP_KEY` = JavaScript 키, 카카오 콘솔에 JavaScript SDK 도메인 등록 필요). 키가 없거나 안 뜨면 Leaflet + OpenStreetMap, 카카오가 못 찾는 곳(해외)은 Nominatim 검색 — 이용 규칙(초당 1회) 때문에 검색 버튼 누를 때만 호출.
 - 냥이 키우기: `src/lib/cats.ts`. 배고픔·물·똥은 저장하지 않고 마지막으로 챙긴 시각(epoch ms)에서 계산한다. 생김새는 `cat-sprite.tsx` 의 SVG (실제 두 냥이 무늬).
 - 푸시 알림 (서버 모드): `src/lib/push.ts` 가 저장 성공 뒤 전후 state 를 비교해 알릴 일 하나를 골라 `/api/push`(로그인 토큰 + RLS 로 같은 커플 구독만 읽음, `web-push`)로 보낸다. 서비스워커는 `public/sw.js`. 구독은 기기마다 설정 시트에서 켠다. 냥이 돌보기·출석은 알리지 않는다. VAPID 키는 `.env.local`·Vercel 환경 변수.
 - 날짜는 `YYYY-MM-DD` 문자열 + UTC 계산(`src/lib/dates.ts`). 사귄 날 = 1일째.
