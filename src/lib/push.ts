@@ -148,6 +148,13 @@ export function describe(before: AppState, after: AppState, me: Who): PushPayloa
   const reviewed = after.places.find((p) => p.reviews[me] && !prevPlaces.get(p.id)?.reviews[me]);
   if (reviewed) return { title: `⭐ ${i} 후기를 남겼어요`, body: `‘${reviewed.name}’ 어땠는지 확인해 볼까요?`, url: "/places", tag: "place" };
 
+  // 사진첩
+  const shots = isNew(after.photos, before.photos).filter((p) => p.by === me);
+  if (shots.length) {
+    const what = shots[0].caption ? `‘${shots[0].caption}’ ` : "";
+    return { title: "📸 사진첩에 사진이 올라왔어요", body: `${i} ${what}사진 ${shots.length}장을 올렸어요`, url: "/album", tag: "album" };
+  }
+
   // 기념일
   const day = isNew(after.anniversaries, before.anniversaries)[0];
   if (day) return { title: `${day.emoji} 기념일이 추가됐어요`, body: `${i} ‘${day.title}’ (${formatDate(day.date)}) 챙겨 뒀어요`, url: "/days", tag: "day" };

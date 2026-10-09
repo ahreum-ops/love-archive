@@ -102,6 +102,19 @@ export type Place = {
   kakaoId?: string;
 };
 
+/** 사진첩에 직접 올린 사진 */
+export type Photo = {
+  id: string;
+  /** 압축된 data URL (서버 모드에선 저장 직전 Storage 주소로 바뀜) */
+  src: string;
+  /** 찍은 날 (YYYY-MM-DD) */
+  date: string;
+  caption?: string;
+  by: Who;
+  /** 올린 시각 (ISO) */
+  createdAt: string;
+};
+
 export type Answers<T> = Record<string, Partial<Record<Who, T>>>;
 
 export type AppState = {
@@ -120,4 +133,5 @@ export type AppState = {
   /** 최근 돌봄 기록 (최신이 앞) */
   catLog: CatLog[];
   places: Place[];
+  photos: Photo[];
 };

@@ -26,6 +26,7 @@ const EMPTY: AppState = {
   catCheckin: {},
   catLog: [],
   places: [],
+  photos: [],
 };
 
 export type SaveResult = { ok: true } | { ok: false; error: string };
@@ -247,12 +248,15 @@ async function uploadPhotos(s: AppState): Promise<AppState> {
     return url;
   };
   const has = (x?: string) => x?.startsWith("data:");
-  if (!has(s.profile?.photo) && !s.bucket.some((b) => has(b.photo)) && !s.places.some((p) => has(p.photo))) return s;
+  if (!has(s.profile?.photo) && !s.bucket.some((b) => has(b.photo)) && !s.places.some((p) => has(p.photo)) && !s.photos.some((p) => has(p.src))) {
+    return s;
+  }
   return {
     ...s,
     profile: s.profile && { ...s.profile, photo: await up(s.profile.photo) },
     bucket: await Promise.all(s.bucket.map(async (b) => (has(b.photo) ? { ...b, photo: await up(b.photo) } : b))),
     places: await Promise.all(s.places.map(async (p) => (has(p.photo) ? { ...p, photo: await up(p.photo) } : p))),
+    photos: await Promise.all(s.photos.map(async (p) => (has(p.src) ? { ...p, src: (await up(p.src))! } : p))),
   };
 }
 

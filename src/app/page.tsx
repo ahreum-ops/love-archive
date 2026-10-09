@@ -7,6 +7,7 @@ import CoupleHero from "@/components/couple-hero";
 import { Card } from "@/components/ui";
 import SettingsSheet from "@/components/settings-sheet";
 import WhoSwitch from "@/components/who-switch";
+import { albumItems } from "@/lib/album";
 import { BALANCE } from "@/lib/content";
 import { dayCount, dLabel, formatDate, upcoming } from "@/lib/dates";
 import { josa } from "@/lib/josa";
@@ -26,6 +27,7 @@ export default function Home() {
   const next = upcoming(profile.startDate, anniversaries).slice(0, 3);
   const done = bucket.filter((b) => b.doneAt).length;
   const pct = bucket.length ? Math.round((done / bucket.length) * 100) : 0;
+  const photos = albumItems(state);
   const recent = bucket.filter((b) => b.doneAt).sort((x, y) => y.doneAt!.localeCompare(x.doneAt!)).slice(0, 3);
 
   // 둘 중 내가 아직 안 고른 첫 질문
@@ -115,6 +117,26 @@ export default function Home() {
           </p>
         </Link>
       </div>
+
+      {/* 사진첩 */}
+      <Link href="/album" className="press block rounded-[28px] bg-white/85 p-5 shadow-soft ring-1 ring-line backdrop-blur">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="font-cute text-lg">사진첩</h2>
+          <span className="text-xs text-ink-soft">{photos.length ? `${photos.length}장 모두 보기 ›` : "사진 올리기 ›"}</span>
+        </div>
+        {photos.length === 0 ? (
+          <div className="rounded-2xl bg-cream px-4 py-5 text-center text-sm text-ink-soft">
+            📷 함께 찍은 사진을 모아 둬요. 버킷리스트·장소 사진도 여기 같이 보여요.
+          </div>
+        ) : (
+          <div className="grid grid-cols-4 gap-1.5">
+            {photos.slice(0, 4).map((p) => (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img key={p.key} src={p.src} alt="" className="aspect-square w-full rounded-2xl object-cover" />
+            ))}
+          </div>
+        )}
+      </Link>
 
       {/* 최근 추억 */}
       <Card>
