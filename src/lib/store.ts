@@ -27,6 +27,7 @@ const EMPTY: AppState = {
   catLog: [],
   places: [],
   photos: [],
+  plans: [],
 };
 
 export type SaveResult = { ok: true } | { ok: false; error: string };

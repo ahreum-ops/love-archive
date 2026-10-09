@@ -5,6 +5,7 @@
 // - 보내기: 내가 저장에 성공하면 저장 전후 state 를 비교해 연인에게 알릴 만한 일을 하나 골라 /api/push 로 보낸다.
 //   냥이 돌보기·출석처럼 자주 생기는 일은 알리지 않는다.
 
+import { timeLabel } from "./calendar";
 import { formatDate } from "./dates";
 import { josa } from "./josa";
 import { isLocked } from "./letters";
@@ -153,6 +154,13 @@ export function describe(before: AppState, after: AppState, me: Who): PushPayloa
   if (shots.length) {
     const what = shots[0].caption ? `‘${shots[0].caption}’ ` : "";
     return { title: "📸 사진첩에 사진이 올라왔어요", body: `${i} ${what}사진 ${shots.length}장을 올렸어요`, url: "/album", tag: "album" };
+  }
+
+  // 캘린더 일정
+  const plan = isNew(after.plans, before.plans).find((p) => p.createdBy === me);
+  if (plan) {
+    const when = `${formatDate(plan.date)}${plan.time ? ` ${timeLabel(plan.time)}` : ""}`;
+    return { title: `${plan.emoji} 새 일정이 생겼어요`, body: `${i} ‘${plan.title}’ (${when}) 일정을 추가했어요`, url: "/days", tag: "plan" };
   }
 
   // 기념일

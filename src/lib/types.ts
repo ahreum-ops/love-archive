@@ -115,6 +115,25 @@ export type Photo = {
   createdAt: string;
 };
 
+/** 공유 캘린더 일정 */
+export type Plan = {
+  id: string;
+  title: string;
+  emoji: string;
+  /** 시작일 (YYYY-MM-DD) */
+  date: string;
+  /** 여러 날짜면 마지막 날 (YYYY-MM-DD) */
+  endDate?: string;
+  /** "HH:MM". 없으면 하루 종일 */
+  time?: string;
+  /** 누구 일정인지 */
+  who: Who | "both";
+  memo?: string;
+  createdBy: Who;
+  /** ISO */
+  createdAt: string;
+};
+
 export type Answers<T> = Record<string, Partial<Record<Who, T>>>;
 
 export type AppState = {
@@ -134,4 +153,5 @@ export type AppState = {
   catLog: CatLog[];
   places: Place[];
   photos: Photo[];
+  plans: Plan[];
 };

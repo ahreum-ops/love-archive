@@ -9,7 +9,8 @@ import SettingsSheet from "@/components/settings-sheet";
 import WhoSwitch from "@/components/who-switch";
 import { albumItems } from "@/lib/album";
 import { BALANCE } from "@/lib/content";
-import { dayCount, dLabel, formatDate, upcoming } from "@/lib/dates";
+import { upcomingPlans } from "@/lib/calendar";
+import { dayCount, diffDays, dLabel, formatDate, today, upcoming } from "@/lib/dates";
 import { josa } from "@/lib/josa";
 import { isLocked } from "@/lib/letters";
 import { useAppState } from "@/lib/store";
@@ -24,7 +25,17 @@ export default function Home() {
   const waiting = letters.filter((l) => l.from !== profile.me && isLocked(l)).length;
 
   const days = dayCount(profile.startDate);
-  const next = upcoming(profile.startDate, anniversaries).slice(0, 3);
+  // 일정 + 기념일 중 가까운 3개 (진행 중인 여러 날 일정은 오늘로)
+  const now = today();
+  const next = [
+    ...upcomingPlans(state.plans, now).map((p) => {
+      const date = p.date < now ? now : p.date;
+      return { key: p.id, emoji: p.emoji, title: p.title, date, daysLeft: diffDays(now, date) };
+    }),
+    ...upcoming(profile.startDate, anniversaries),
+  ]
+    .sort((x, y) => x.daysLeft - y.daysLeft)
+    .slice(0, 3);
   const done = bucket.filter((b) => b.doneAt).length;
   const pct = bucket.length ? Math.round((done / bucket.length) * 100) : 0;
   const photos = albumItems(state);
@@ -67,10 +78,10 @@ export default function Home() {
         </Link>
       )}
 
-      {/* 다가오는 기념일 */}
+      {/* 다가오는 일정·기념일 */}
       <Card>
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="font-cute text-lg">다가오는 기념일</h2>
+          <h2 className="font-cute text-lg">다가오는 날</h2>
           <Link href="/days" className="text-xs text-ink-soft">
             전체 보기 ›
           </Link>

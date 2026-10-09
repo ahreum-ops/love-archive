@@ -15,7 +15,7 @@ const TABS = [
   { href: "/places", label: "장소", icon: PinIcon },
   { href: "/letters", label: "편지", icon: MailIcon },
   { href: "/play", label: "놀이", icon: GameIcon },
-  { href: "/days", label: "기념일", icon: CalIcon },
+  { href: "/days", label: "캘린더", icon: CalIcon },
 ];
 
 export default function AppShell({ children }: { children: ReactNode }) {
