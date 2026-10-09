@@ -42,6 +42,7 @@ function PlaceForm({ place, profile, onDone }: { place?: Place; profile: Profile
   const [locating, setLocating] = useState(false);
   const [name, setName] = useState(place?.name ?? "");
   const [address, setAddress] = useState(place?.address ?? "");
+  const [kakaoId, setKakaoId] = useState(place?.kakaoId);
   const [category, setCategory] = useState(place?.category ?? "food");
   const [date, setDate] = useState(place?.visitedAt ?? today());
   const [photo, setPhoto] = useState(place?.photo);
@@ -70,11 +71,14 @@ function PlaceForm({ place, profile, onDone }: { place?: Place; profile: Profile
     setFocus({ lat: h.lat, lng: h.lng, zoom: 16 });
     setName(h.name);
     setAddress(h.address);
+    setKakaoId(h.kakaoId);
+    if (h.category) setCategory(h.category);
     setHits(null);
   }
 
   async function dropPin(p: LatLng) {
     setPick(p);
+    setKakaoId(undefined);
     const r = await reverseGeocode(p.lat, p.lng);
     setAddress(r.address);
     setName((n) => n || r.name);
@@ -117,7 +121,7 @@ function PlaceForm({ place, profile, onDone }: { place?: Place; profile: Profile
   function save() {
     if (!pick) return;
     const review: PlaceReview | undefined = stars > 0 ? { stars, comment: comment.trim() || undefined, again: again || undefined } : undefined;
-    const basics = { name: name.trim(), category, lat: pick.lat, lng: pick.lng, address: address.trim() || undefined, visitedAt: date, photo };
+    const basics = { name: name.trim(), category, lat: pick.lat, lng: pick.lng, address: address.trim() || undefined, visitedAt: date, photo, kakaoId };
     const r = update((s) => {
       if (!place) {
         const created: Place = { id: uid(), ...basics, reviews: review ? { [me]: review } : {}, createdBy: me };
@@ -161,14 +165,17 @@ function PlaceForm({ place, profile, onDone }: { place?: Place; profile: Profile
           <ul className="max-h-56 overflow-y-auto rounded-2xl bg-cream p-1 ring-1 ring-line">
             {hits.length === 0 ? (
               <li className="px-3 py-3 text-sm text-ink-soft">
-                검색 결과가 없어요. 지도는 가게 이름보다 <b>동네·역 이름</b>을 더 잘 찾아요 — 근처로 옮긴 뒤 지도에서 콕 찍어 주세요.
+                검색 결과가 없어요. 동네 이름을 같이 넣어 보거나(예: <b>성수 카페</b>), 지도에서 직접 콕 찍어 주세요.
               </li>
             ) : (
               hits.map((h, i) => (
                 <li key={i}>
                   <button onClick={() => choose(h)} className="press w-full rounded-xl px-3 py-2 text-left hover:bg-white">
                     <p className="text-[15px]">{h.name}</p>
-                    <p className="truncate text-xs text-ink-soft">{h.address}</p>
+                    <p className="truncate text-xs text-ink-soft">
+                      {h.kind && <span className="mr-1 text-rose">{h.kind}</span>}
+                      {h.address}
+                    </p>
                   </button>
                 </li>
               ))
@@ -391,7 +398,7 @@ function Detail({ place, profile, onEdit, onClose }: { place: Place; profile: Pr
           기록 고치기
         </Button>
         <a
-          href={`https://map.kakao.com/link/map/${encodeURIComponent(place.name)},${place.lat},${place.lng}`}
+          href={place.kakaoId ? `https://place.map.kakao.com/${place.kakaoId}` : `https://map.kakao.com/link/map/${encodeURIComponent(place.name)},${place.lat},${place.lng}`}
           target="_blank"
           rel="noreferrer"
           className="press flex items-center rounded-full bg-cream px-5 font-cute text-[15px] text-ink-soft"

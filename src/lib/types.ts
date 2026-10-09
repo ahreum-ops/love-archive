@@ -98,6 +98,8 @@ export type Place = {
   /** 그날 사진 (압축된 data URL) */
   photo?: string;
   createdBy: Who;
+  /** 카카오 검색으로 고른 곳이면 그 장소 id (place.map.kakao.com/{id}) */
+  kakaoId?: string;
 };
 
 export type Answers<T> = Record<string, Partial<Record<Who, T>>>;
