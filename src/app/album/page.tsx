@@ -28,25 +28,21 @@ export default function AlbumPage() {
     if (shared === null || sharedTaken.current) return;
     sharedTaken.current = true;
     window.history.replaceState(null, "", "/album");
-    // 끝의 (코드) 는 어디서 막혔는지 알려 달라고 할 때 쓰는 표시. why 는 서비스워커가 붙여 준 오류 내용
-    const why = params.get("why");
-    const code = (c: string) => ` (${c}${why ? ` · ${why}` : ""})`;
-    takeSharedPhotos()
-      .then((blobs) => {
-        if (blobs.length) return pick(blobs);
+    // 끝의 (코드) 는 어디서 막혔는지 알려 달라고 할 때 쓰는 표시
+    (shared === "nosw" ? Promise.resolve({ photos: [], error: "nosw" }) : takeSharedPhotos())
+      .then(({ photos, error }) => {
+        if (photos.length) return pick(photos);
         setError(
-          shared === "nosw"
-            ? "앱이 막 업데이트돼서 사진을 못 받았어요. 이 화면을 연 채로 갤러리에서 한 번 더 공유해 주세요." + code("nosw")
-            : shared === "error"
-              ? "공유한 사진을 읽지 못했어요. + 버튼으로 올려 주세요." + code("sw-error")
-              : shared === "0"
-                ? "공유에 사진이 들어 있지 않았어요. 다른 갤러리 앱에서 공유하거나 + 버튼으로 올려 주세요." + code("empty")
-                : "공유한 사진을 넘겨받지 못했어요. 한 번 더 공유하거나 + 버튼으로 올려 주세요." + code("no-cache"),
+          error === "nosw"
+            ? "앱이 막 업데이트돼서 사진을 못 받았어요. 이 화면을 연 채로 갤러리에서 한 번 더 공유해 주세요. (nosw)"
+            : error
+              ? `공유한 사진을 읽지 못했어요. + 버튼으로 올려 주세요. (sw-error · ${error})`
+              : "공유한 사진을 넘겨받지 못했어요. 한 번 더 공유하거나 + 버튼으로 올려 주세요. (empty)",
         );
       })
       .catch((e) => {
         console.error("[album] shared photos", e);
-        setError("공유한 사진을 불러오지 못했어요. + 버튼으로 올려 주세요." + code(`take · ${e instanceof Error ? e.message : e}`));
+        setError(`공유한 사진을 불러오지 못했어요. + 버튼으로 올려 주세요. (take · ${e instanceof Error ? e.message : e})`);
       });
   }, []);
 

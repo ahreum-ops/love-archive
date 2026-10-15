@@ -4,22 +4,26 @@ self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (e) => e.waitUntil(self.clients.claim()));
 
 // 갤러리에서 '공유 → 러브아카이브' 하면 manifest 의 share_target 대로 /share 에 사진이 POST 된다.
-// 받은 사진을 캐시에 잠깐 넣어 두고 사진첩으로 보내면, 사진첩이 꺼내서 올리기 시트를 띄우고 지운다.
-// 캐시에 넣다 실패하면 메모리에 들고 있다가 사진첩이 메시지(take-shared)로 달라고 할 때 넘긴다.
+// 안드로이드 크롬은 응답을 기다리는 동안 본문을 읽으면 'Failed to fetch' 가 나는 경우가 있어서
+// (구글 Squoosh 와 같은 방식) 먼저 사진첩으로 보내 놓고, 사진은 그 뒤에 읽는다.
+// 읽은 사진은 메모리(sharePending)에 두고 사진첩이 메시지(take-shared)로 받아 간다.
+// 그 사이 서비스워커가 다시 뜨면 메모리가 날아가니 캐시에도 한 벌 넣어 둔다.
 const SHARE_CACHE = "shared-photos";
-let sharedInMemory = [];
+let sharePending = null; // Promise<{ files: File[] } | { error: string }>
 
 self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== "POST" || url.origin !== self.location.origin || url.pathname !== "/share") return;
-  e.respondWith(receiveShare(e.request));
+  sharePending = readShare(e.request);
+  e.waitUntil(sharePending);
+  e.respondWith(Response.redirect(new URL("/album?shared=wait", self.location.origin).href, 303));
 });
 
-async function receiveShare(request) {
-  const album = (params) => Response.redirect(new URL(`/album?${new URLSearchParams(params)}`, self.location.origin).href, 303);
-  // 어느 단계에서 왜 실패했는지 사진첩 안내에 그대로 보여 준다
-  const why = (step, err) => `${step}: ${(err && (err.name || "")) + " " + (err && err.message ? err.message : String(err))}`.slice(0, 160);
+// 어느 단계에서 왜 실패했는지 사진첩 안내에 그대로 보여 준다
+const why = (step, err) => `${step}: ${(err && err.name) || ""} ${(err && err.message) || String(err)}`.slice(0, 160);
 
+async function readShare(request) {
+  const copy = request.clone();
   let files;
   try {
     const form = await request.formData();
@@ -27,31 +31,66 @@ async function receiveShare(request) {
     files = [...form.values()].filter((f) => typeof f === "object" && f.size > 0);
   } catch (err) {
     console.error("[sw] share formData failed", err);
-    return album({ shared: "error", why: why("form", err) });
+    // 두 번째 시도: 본문을 바이트로 받아 직접 나눈다
+    try {
+      files = parseMultipart(new Uint8Array(await copy.arrayBuffer()), request.headers.get("content-type") || "");
+    } catch (err2) {
+      console.error("[sw] share raw read failed", err2);
+      return { error: `${why("form", err)} / ${why("raw", err2)}` };
+    }
   }
-
-  sharedInMemory = files;
   try {
     await caches.delete(SHARE_CACHE);
     const cache = await caches.open(SHARE_CACHE);
     for (let i = 0; i < files.length; i++) {
-      // 파일을 먼저 다 읽어서 넣는다 (갤러리 파일을 나중에 읽으면 실패하는 기기가 있음)
-      const body = await files[i].arrayBuffer();
-      await cache.put(`/shared/${i}`, new Response(body, { headers: { "content-type": files[i].type || "image/jpeg" } }));
+      await cache.put(`/shared/${i}`, new Response(files[i], { headers: { "content-type": files[i].type || "image/jpeg" } }));
     }
-    sharedInMemory = [];
-    return album({ shared: String(files.length) });
   } catch (err) {
-    console.error("[sw] share cache failed", err);
-    await caches.delete(SHARE_CACHE).catch(() => undefined);
-    return album({ shared: String(files.length), why: why("cache", err) });
+    console.error("[sw] share cache failed", err); // 메모리에 있으니 계속
   }
+  return { files };
+}
+
+/** multipart/form-data 본문에서 파일 부분만 꺼낸다 */
+function parseMultipart(bytes, contentType) {
+  const m = /boundary=(?:"([^"]+)"|([^;]+))/i.exec(contentType);
+  if (!m) throw new Error("boundary 없음");
+  const enc = new TextEncoder();
+  const delim = enc.encode(`--${m[1] || m[2]}`);
+  const find = (from, pat) => {
+    outer: for (let i = from; i <= bytes.length - pat.length; i++) {
+      for (let j = 0; j < pat.length; j++) if (bytes[i + j] !== pat[j]) continue outer;
+      return i;
+    }
+    return -1;
+  };
+  const crlf2 = enc.encode("\r\n\r\n");
+  const files = [];
+  let at = find(0, delim);
+  while (at >= 0) {
+    const start = at + delim.length + 2; // 경계 뒤 \r\n
+    const next = find(start, delim);
+    if (next < 0) break;
+    const headEnd = find(start, crlf2);
+    if (headEnd > 0 && headEnd < next) {
+      const head = new TextDecoder().decode(bytes.subarray(start, headEnd));
+      const body = bytes.slice(headEnd + 4, next - 2); // 다음 경계 앞 \r\n 제외
+      if (/filename=/i.test(head) && body.length > 0) {
+        const type = (/content-type:\s*([^\r\n]+)/i.exec(head) || [])[1] || "";
+        files.push(new File([body], `shared-${files.length}`, { type: type.trim() }));
+      }
+    }
+    at = next;
+  }
+  return files;
 }
 
 self.addEventListener("message", (e) => {
   if (e.data !== "take-shared" || !e.ports[0]) return;
-  e.ports[0].postMessage(sharedInMemory);
-  sharedInMemory = [];
+  const port = e.ports[0];
+  const pending = sharePending;
+  sharePending = null;
+  e.waitUntil((async () => port.postMessage(pending ? await pending : null))());
 });
 
 self.addEventListener("push", (e) => {
