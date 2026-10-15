@@ -14,8 +14,9 @@
 - 사진첩(`/album`, 홈 카드에서 들어감 — 탭바는 6칸이 한계): 직접 올린 `photos` + 버킷 완료 사진 + 장소 사진을 `src/lib/album.ts` 가 모아 최신순으로. 버킷·장소 사진은 원래 화면에서만 고친다.
   - 갤러리 공유로 올리기: manifest `share_target` → `/share` POST 를 `public/sw.js` 가 가로채 캐시 `shared-photos` 에 넣고 `/album?shared=N` 으로 보냄 → 사진첩이 `takeSharedPhotos()`(`src/lib/sw.ts`)로 꺼내 올리기 시트를 연다. 설치된 안드로이드 PWA 전용(iOS 는 미지원). 서비스워커는 앱 셸이 항상 등록한다.
 - 공유 캘린더(`/days`, 탭 이름 '캘린더'): 일정 `plans`(누구 일정·시간·여러 날) + 기념일(자동 100일·주년 포함) + 그날의 추억(버킷·장소·사진)을 `src/lib/calendar.ts` 가 날짜별로 모은다. `today()` 는 프리렌더 중 못 부르니 useState 초기값에 쓰지 말 것.
+- 채팅(`/chat`, 홈 카드·홈 헤더 💬 버튼으로 들어감, 이 화면에선 탭바를 숨김): `src/lib/chat.ts`. 메시지는 AppState 가 **아니다** — 서버 모드는 Supabase `messages` 테이블(RLS 로 같은 커플만, insert 는 내 who 로만, 읽음·반응·보내기 취소는 RPC `mark_messages_read`·`react_message`·`unsend_message` 로만, 보내기 취소는 지우지 않고 `deleted`), 체험 모드는 localStorage `love-archive:chat:v1`. 최근 40개씩(`PAGE`) 불러오고 위로 올리면 이전 대화. 보내기는 낙관적 → 실패하면 '다시 보내기'. 채팅 사진은 Storage `photos/<couple_id>/chat/`. 상대가 채팅 화면을 보고 있으면(Realtime presence) 푸시를 안 보낸다.
 - 냥이 키우기: `src/lib/cats.ts`. 배고픔·물·똥은 저장하지 않고 마지막으로 챙긴 시각(epoch ms)에서 계산한다. 생김새는 `cat-sprite.tsx` 의 SVG (실제 두 냥이 무늬).
-- 푸시 알림 (서버 모드): `src/lib/push.ts` 가 저장 성공 뒤 전후 state 를 비교해 알릴 일 하나를 골라 `/api/push`(로그인 토큰 + RLS 로 같은 커플 구독만 읽음, `web-push`)로 보낸다. 서비스워커는 `public/sw.js`. 구독은 기기마다 설정 시트에서 켠다. 냥이 돌보기·출석은 알리지 않는다. VAPID 키는 `.env.local`·Vercel 환경 변수.
+- 푸시 알림 (서버 모드): `src/lib/push.ts` 가 저장 성공 뒤 전후 state 를 비교해 알릴 일 하나를 골라(채팅은 `chat.ts` 가 보낸 직후 직접 `sendPush`) `/api/push`(로그인 토큰 + RLS 로 같은 커플 구독만 읽음, `web-push`)로 보낸다. 서비스워커는 `public/sw.js`. 구독은 기기마다 설정 시트에서 켠다. 냥이 돌보기·출석은 알리지 않는다. VAPID 키는 `.env.local`·Vercel 환경 변수.
 - 날짜는 `YYYY-MM-DD` 문자열 + UTC 계산(`src/lib/dates.ts`). 사귄 날 = 1일째.
 - 디자인: 파스텔 몽글. 색 토큰은 `globals.css` 의 `@theme`. 글꼴 Gowun Dodum(본문)·Jua(제목, `font-cute`).
 - 저장 실패는 삼키지 말고 `<Banner>` 로 보여준다. 빈 화면엔 원인 + 다음 행동을 같이 준다.
@@ -25,4 +26,5 @@
 1. ✅ D-day·기념일, 홈 커플 사진, 버킷리스트(직접 추가·카드/목록·완료 사진), 편지(편지지·예약 열람·읽음), 밸런스 게임·취향 설문(다시 누르면 취소), 우리집 냥이 키우기(홈 방·출석·밥/물/똥·레벨), 우리의 장소(지도 핀·두 사람 별점/후기·또 갈 곳) — 체험 모드
 2. ✅ Supabase 연결: 이메일+비밀번호 로그인, 초대 코드로 커플 연결, 실시간 동기화, 사진은 Storage → Vercel(개인 계정) 배포
 3. ✅ 푸시 알림 (편지·버킷·장소·기념일·놀이·사진첩·일정), 사진첩, 공유 캘린더
-4. 채팅, 예약 편지 열리는 날 알림(크론 필요)
+4. ✅ 채팅(말풍선·읽음·사진·이모지·하트 반응·보내기 취소, 실시간 + 푸시)
+5. 예약 편지 열리는 날 알림(크론 필요)

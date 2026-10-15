@@ -137,3 +137,69 @@ end $$;
 
 revoke execute on function public.save_push_subscription(text, text, text) from anon, public;
 grant execute on function public.save_push_subscription(text, text, text) to authenticated;
+
+-- ───────── 채팅 (로드맵 4) ─────────
+-- 메시지는 couples.state 와 따로 한 줄씩 저장한다 (state 에 넣으면 쌓일수록 커지고 저장 충돌이 잦아져서).
+-- 보내기는 insert 정책으로 (내 커플 + 내 who 로만). 읽음·반응·보내기 취소는 아래 함수로만 바꾼다.
+-- 보내기 취소는 지우지 않고 deleted 로 표시한다 (실시간 DELETE 는 커플 필터가 안 걸려서).
+create table if not exists public.messages (
+  id uuid primary key default gen_random_uuid(),
+  couple_id uuid not null references public.couples on delete cascade,
+  sender text not null check (sender in ('a', 'b')),
+  body text not null default '' check (char_length(body) <= 2000),
+  photo text,
+  reactions jsonb not null default '{}',
+  read_at timestamptz,
+  deleted boolean not null default false,
+  created_at timestamptz not null default now(),
+  check (deleted or body <> '' or photo is not null)
+);
+
+create index if not exists messages_couple_created on public.messages (couple_id, created_at desc);
+
+alter table public.messages enable row level security;
+
+-- 내가 커플에서 a 인지 b 인지
+create or replace function public.my_who() returns text
+language sql stable security definer set search_path = '' as $$
+  select who from public.couple_members where user_id = auth.uid()
+$$;
+
+drop policy if exists "read couple messages" on public.messages;
+create policy "read couple messages" on public.messages
+  for select to authenticated using (couple_id = public.my_couple_id());
+
+drop policy if exists "send own messages" on public.messages;
+create policy "send own messages" on public.messages
+  for insert to authenticated
+  with check (couple_id = public.my_couple_id() and sender = public.my_who() and not deleted and read_at is null and reactions = '{}');
+
+-- 상대가 보낸 메시지를 지금까지 다 읽음으로
+create or replace function public.mark_messages_read() returns void
+language sql security definer set search_path = '' as $$
+  update public.messages set read_at = now()
+  where couple_id = public.my_couple_id() and sender <> public.my_who() and read_at is null
+$$;
+
+-- 반응 달기 (emoji 가 비면 내 반응 지우기)
+create or replace function public.react_message(mid uuid, emoji text) returns void
+language sql security definer set search_path = '' as $$
+  update public.messages
+  set reactions = case when coalesce(emoji, '') = '' then reactions - public.my_who()
+                       else reactions || jsonb_build_object(public.my_who(), left(emoji, 16)) end
+  where id = mid and couple_id = public.my_couple_id() and not deleted
+$$;
+
+-- 내가 보낸 메시지 보내기 취소
+create or replace function public.unsend_message(mid uuid) returns void
+language sql security definer set search_path = '' as $$
+  update public.messages set deleted = true, body = '', photo = null, reactions = '{}'
+  where id = mid and couple_id = public.my_couple_id() and sender = public.my_who()
+$$;
+
+revoke execute on function public.my_who(), public.mark_messages_read(), public.react_message(uuid, text), public.unsend_message(uuid) from anon, public;
+grant execute on function public.my_who(), public.mark_messages_read(), public.react_message(uuid, text), public.unsend_message(uuid) to authenticated;
+
+do $$ begin
+  alter publication supabase_realtime add table public.messages;
+exception when duplicate_object then null; end $$;

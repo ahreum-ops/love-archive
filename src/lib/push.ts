@@ -90,10 +90,14 @@ async function saveSubscription(sub: PushSubscription): Promise<{ ok: true } | {
   return { ok: true };
 }
 
-/** 저장 성공 뒤 불린다. 알림이 안 가도 저장은 된 것이라 실패는 기록만 남긴다 */
+/** 저장 성공 뒤 불린다 */
 export async function notifyPartner(before: AppState, after: AppState, me: Who) {
   const payload = describe(before, after, me);
-  if (!payload) return;
+  if (payload) await sendPush(payload);
+}
+
+/** 연인 기기들로 알림 보내기. 알림이 안 가도 저장은 된 것이라 실패는 기록만 남긴다 */
+export async function sendPush(payload: PushPayload) {
   try {
     const { data } = await supabase().auth.getSession();
     const token = data.session?.access_token;

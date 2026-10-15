@@ -37,10 +37,10 @@ export type Session =
   | { status: "signed-out" }
   | { status: "recovery" }
   | { status: "no-couple"; email: string }
-  | { status: "ready"; email: string; who: Who; inviteCode: string; partnerJoined: boolean };
+  | { status: "ready"; email: string; who: Who; coupleId: string; inviteCode: string; partnerJoined: boolean };
 
 let state: AppState | null = null;
-let session: Session = REMOTE ? { status: "loading" } : { status: "ready", email: "", who: "a", inviteCode: "", partnerJoined: true };
+let session: Session = REMOTE ? { status: "loading" } : { status: "ready", email: "", who: "a", coupleId: "", inviteCode: "", partnerJoined: true };
 let syncError: string | null = null;
 const listeners = new Set<() => void>();
 
@@ -76,6 +76,15 @@ function getSnapshot(): AppState | null {
 /** 서버 렌더링 중이나 불러오기 전에는 null */
 export function useAppState(): AppState | null {
   return useSyncExternalStore(subscribe, getSnapshot, () => null);
+}
+
+/** 훅 밖(채팅 저장소 등)에서 지금 로그인 상태 읽기 */
+export function currentSession(): Session {
+  return session;
+}
+
+export function currentState(): AppState | null {
+  return getSnapshot();
 }
 
 const loadingSession: Session = { status: "loading" };
@@ -311,6 +320,7 @@ async function loadCouple() {
     status: "ready",
     email,
     who: mine.who as Who,
+    coupleId: mine.couple_id,
     inviteCode: couple.invite_code,
     partnerJoined: (members ?? []).length >= 2,
   };

@@ -8,20 +8,24 @@ import { Card } from "@/components/ui";
 import SettingsSheet from "@/components/settings-sheet";
 import WhoSwitch from "@/components/who-switch";
 import { albumItems } from "@/lib/album";
+import { clockLabel, dayLabel, localDay, useChat } from "@/lib/chat";
 import { BALANCE } from "@/lib/content";
 import { upcomingPlans } from "@/lib/calendar";
 import { dayCount, diffDays, dLabel, formatDate, today, upcoming } from "@/lib/dates";
 import { josa } from "@/lib/josa";
 import { isLocked } from "@/lib/letters";
 import { useAppState } from "@/lib/store";
+import type { Who } from "@/lib/types";
 
 export default function Home() {
   const state = useAppState();
+  const chat = useChat();
   const [settings, setSettings] = useState(false);
   if (!state?.profile) return null;
   const { profile, bucket, anniversaries, balance, letters } = state;
   const partner = profile.me === "a" ? "b" : "a";
   const unread = letters.filter((l) => l.from !== profile.me && !l.readAt && !isLocked(l)).length;
+  const chatUnread = chat.messages.filter((m) => m.from !== profile.me && !m.readAt && !m.deleted).length;
   const waiting = letters.filter((l) => l.from !== profile.me && isLocked(l)).length;
 
   const days = dayCount(profile.startDate);
@@ -52,17 +56,27 @@ export default function Home() {
     <div className="space-y-4">
       <div className="flex items-center justify-between px-1">
         <WhoSwitch />
+        <div className="ml-auto flex gap-2">
+        <Link href="/chat" className="press relative rounded-full bg-white/90 p-2 text-ink-soft shadow-soft ring-1 ring-line" aria-label={chatUnread ? `채팅 (안 읽은 메시지 ${chatUnread}개)` : "채팅"}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 4.5c-4.7 0-8.5 3-8.5 6.8 0 2.2 1.3 4.2 3.3 5.4l-.6 3 3.3-1.9c.8.2 1.6.3 2.5.3 4.7 0 8.5-3 8.5-6.8S16.7 4.5 12 4.5z" />
+          </svg>
+          {chatUnread > 0 && <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-rose ring-2 ring-white" />}
+        </Link>
         <button onClick={() => setSettings(true)} className="press rounded-full bg-white/90 p-2 text-ink-soft shadow-soft ring-1 ring-line" aria-label="설정">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
             <circle cx="12" cy="12" r="3" />
             <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" />
           </svg>
         </button>
+        </div>
       </div>
 
       <CoupleHero profile={profile} days={days} />
 
       <CatRoom state={state} />
+
+      <ChatCard chat={chat} me={profile.me} names={profile.names} />
 
       {(unread > 0 || waiting > 0) && (
         <Link href="/letters" className="press flex items-center gap-3 rounded-[24px] bg-gradient-to-r from-pink to-violet px-5 py-4 text-white shadow-pop">
@@ -181,5 +195,42 @@ export default function Home() {
 
       <SettingsSheet open={settings} onClose={() => setSettings(false)} />
     </div>
+  );
+}
+
+/** 채팅 입구: 마지막 메시지 미리보기 + 안 읽은 수 */
+function ChatCard({ chat, me, names }: { chat: ReturnType<typeof useChat>; me: Who; names: Record<Who, string> }) {
+  const partner: Who = me === "a" ? "b" : "a";
+  const last = chat.messages.at(-1);
+  const unread = chat.messages.filter((m) => m.from !== me && !m.readAt && !m.deleted).length;
+  // 불러온 게 전부 안 읽은 거면 더 있을 수 있다
+  const more = chat.hasMore && unread === chat.messages.length;
+  const preview = !last ? "" : last.deleted ? "보내기를 취소한 메시지예요" : last.photo ? "📷 사진" : last.body;
+  const when = last && (localDay(last.createdAt) === localDay(new Date().toISOString()) ? clockLabel(last.createdAt) : dayLabel(last.createdAt).replace(/ S+요일$/, ""));
+  return (
+    <Link href="/chat" className="press flex items-center gap-3 rounded-[28px] bg-sky/90 px-5 py-4 shadow-soft ring-1 ring-white">
+      <span className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white text-2xl shadow-soft">
+        💬
+        {unread > 0 && (
+          <span className="absolute -right-1 -top-1 min-w-5 animate-pop rounded-full bg-rose px-1.5 text-center font-cute text-xs leading-5 text-white">
+            {unread}
+            {more ? "+" : ""}
+          </span>
+        )}
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-baseline justify-between gap-2">
+          <h2 className="font-cute text-lg text-ink">{josa(names[partner], "과", "와")} 채팅</h2>
+          {when && <span className="shrink-0 text-[11px] text-ink-soft">{when}</span>}
+        </div>
+        <p className="truncate text-sm text-ink-soft">
+          {chat.loading
+            ? "대화를 불러오는 중…"
+            : last
+              ? `${last.from === me ? "나" : names[partner]}: ${preview}`
+              : `아직 나눈 대화가 없어요. ${names[partner]}에게 첫 마디를 건네 봐요 ›`}
+        </p>
+      </div>
+    </Link>
   );
 }
