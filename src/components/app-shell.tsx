@@ -60,7 +60,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
           </main>
           {state === null && <Splash />}
           {/* 채팅은 입력창이 아래를 차지해서 탭바를 숨긴다 (홈으로 돌아가는 버튼이 따로 있음) */}
-          {state && !pathname.startsWith("/chat") && <nav className="fixed inset-x-0 bottom-0 z-40 mx-auto w-full max-w-md px-4 pb-[calc(env(safe-area-inset-bottom)+12px)]">
+          {state && !pathname.startsWith("/chat") && !pathname.startsWith("/play/volley") && <nav className="fixed inset-x-0 bottom-0 z-40 mx-auto w-full max-w-md px-4 pb-[calc(env(safe-area-inset-bottom)+12px)]">
             <div className="flex rounded-[26px] bg-white/90 p-1.5 shadow-pop ring-1 ring-line backdrop-blur">
               {TABS.map(({ href, label, icon: Icon }) => {
                 const active = href === "/" ? pathname === "/" : pathname.startsWith(href);

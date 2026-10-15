@@ -6,6 +6,13 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
       "port": 3000
+    },
+    {
+      "name": "dev-trial",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "env": { "NEXT_PUBLIC_SUPABASE_URL": "", "NEXT_PUBLIC_SUPABASE_ANON_KEY": "" },
+      "port": 3000
     }
   ]
 }

@@ -71,6 +71,17 @@ export default function PlayPage() {
           </div>
         </Link>
 
+        <Link href="/play/volley" className="press block overflow-hidden rounded-[32px] bg-gradient-to-br from-mint to-lilac p-6 shadow-pop ring-1 ring-white">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="font-cute text-2xl text-ink">냥이 배구</p>
+              <p className="mt-1 text-sm text-ink-soft">각자 폰으로 실시간 대결! 털실공을 네트 너머로</p>
+            </div>
+            <span className="text-4xl">🧶</span>
+          </div>
+          <p className="mt-5 inline-block rounded-full bg-white/80 px-3 py-1 font-cute text-sm text-violet">1 : 1 대결 · 컴퓨터 연습</p>
+        </Link>
+
         <div className="rounded-[28px] border-2 border-dashed border-line bg-white/50 p-5 text-center text-sm text-ink-soft">
           <p className="font-cute text-base text-ink">더 많은 놀이를 준비 중이에요</p>
           <p className="mt-1">연인을 얼마나 아는지 맞히는 퀴즈 등이 곧 추가돼요.</p>
