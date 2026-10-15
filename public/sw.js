@@ -14,7 +14,8 @@ self.addEventListener("fetch", (e) => {
     (async () => {
       try {
         const form = await e.request.formData();
-        const files = form.getAll("photos").filter((f) => f instanceof File && f.type.startsWith("image/"));
+        // 갤러리에 따라 type 이 비어 오기도 해서 형식은 보지 않는다 (manifest accept 가 이미 사진만 고름)
+        const files = form.getAll("photos").filter((f) => f instanceof File && f.size > 0);
         await caches.delete(SHARE_CACHE);
         const cache = await caches.open(SHARE_CACHE);
         await Promise.all(
@@ -23,7 +24,7 @@ self.addEventListener("fetch", (e) => {
         return Response.redirect(`/album?shared=${files.length}`, 303);
       } catch (err) {
         console.error("[sw] share failed", err);
-        return Response.redirect("/album?shared=0", 303);
+        return Response.redirect("/album?shared=error", 303);
       }
     })(),
   );

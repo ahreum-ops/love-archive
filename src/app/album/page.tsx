@@ -30,7 +30,16 @@ export default function AlbumPage() {
     takeSharedPhotos()
       .then((blobs) => {
         if (blobs.length) return pick(blobs);
-        setError("공유한 사진을 받지 못했어요. 앱을 한 번 열어 둔 뒤 다시 공유하거나, + 버튼으로 올려 주세요.");
+        // 끝의 (코드) 는 어디서 막혔는지 알려 달라고 할 때 쓰는 표시
+        setError(
+          shared === "nosw"
+            ? "앱이 막 업데이트돼서 사진을 못 받았어요. 이 화면을 연 채로 갤러리에서 한 번 더 공유해 주세요. (nosw)"
+            : shared === "error"
+              ? "공유한 사진을 읽지 못했어요. + 버튼으로 올려 주세요. (sw-error)"
+              : shared === "0"
+                ? "공유에 사진이 들어 있지 않았어요. 다른 갤러리 앱에서 공유하거나 + 버튼으로 올려 주세요. (empty)"
+                : "공유한 사진을 넘겨받지 못했어요. 한 번 더 공유하거나 + 버튼으로 올려 주세요. (no-cache)",
+        );
       })
       .catch((e) => {
         console.error("[album] shared photos", e);
