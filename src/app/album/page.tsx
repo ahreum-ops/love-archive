@@ -1,12 +1,13 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { PhotoUploadSheet, PhotoViewer } from "@/components/photo-sheets";
 import { Banner, Empty, PageHeader } from "@/components/ui";
 import { albumItems, monthLabel, SOURCE_LABEL, type AlbumSource } from "@/lib/album";
 import { compressImage } from "@/lib/image";
 import { useAppState } from "@/lib/store";
 import { REMOTE } from "@/lib/supabase";
+import { takeSharedPhotos } from "@/lib/sw";
 
 type Filter = "all" | AlbumSource;
 
@@ -18,6 +19,25 @@ export default function AlbumPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const sharedTaken = useRef(false);
+
+  // 갤러리에서 '공유 → 러브아카이브' 로 들어오면 서비스워커가 받아 둔 사진으로 올리기 시트를 연다
+  useEffect(() => {
+    const shared = new URLSearchParams(window.location.search).get("shared");
+    if (shared === null || sharedTaken.current) return;
+    sharedTaken.current = true;
+    window.history.replaceState(null, "", "/album");
+    takeSharedPhotos()
+      .then((blobs) => {
+        if (blobs.length) return pick(blobs);
+        setError("공유한 사진을 받지 못했어요. 앱을 한 번 열어 둔 뒤 다시 공유하거나, + 버튼으로 올려 주세요.");
+      })
+      .catch((e) => {
+        console.error("[album] shared photos", e);
+        setError("공유한 사진을 불러오지 못했어요. + 버튼으로 올려 주세요.");
+      });
+  }, []);
+
   if (!state?.profile) return null;
 
   const all = albumItems(state);
@@ -30,13 +50,13 @@ export default function AlbumPage() {
   }
   const openIndex = items.findIndex((p) => p.key === openKey);
 
-  async function pick(files: FileList | null) {
+  async function pick(files: ArrayLike<Blob> | null) {
     if (!files?.length) return;
     setBusy(true);
     try {
       // 서버 모드는 Storage 에 올라가니 조금 크게, 체험 모드는 브라우저 저장 공간이 작아서 작게
       const size = REMOTE ? 1280 : 720;
-      setPicked(await Promise.all([...files].map((f) => compressImage(f, size, 0.8))));
+      setPicked(await Promise.all(Array.from(files, (f) => compressImage(f, size, 0.8))));
     } catch (e) {
       setError(e instanceof Error ? e.message : "사진을 불러오지 못했어요");
     } finally {

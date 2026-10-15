@@ -10,6 +10,7 @@ import { formatDate } from "./dates";
 import { josa } from "./josa";
 import { isLocked } from "./letters";
 import { REMOTE, supabase } from "./supabase";
+import { registerSW } from "./sw";
 import type { AppState, Who } from "./types";
 
 const VAPID = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
@@ -25,16 +26,10 @@ export function pushSupported(): boolean {
   );
 }
 
-let registration: Promise<ServiceWorkerRegistration> | null = null;
-function sw(): Promise<ServiceWorkerRegistration> {
-  registration ??= navigator.serviceWorker.register("/sw.js", { scope: "/", updateViaCache: "none" });
-  return registration;
-}
-
 export async function pushStatus(): Promise<PushStatus> {
   if (!pushSupported()) return "unsupported";
   if (Notification.permission === "denied") return "denied";
-  const sub = await (await sw()).pushManager.getSubscription();
+  const sub = await (await registerSW()).pushManager.getSubscription();
   return sub && Notification.permission === "granted" ? "on" : "off";
 }
 
@@ -45,7 +40,7 @@ export async function enablePush(): Promise<{ ok: true } | { ok: false; error: s
     return { ok: false, error: "알림이 차단돼 있어요. 주소창 왼쪽 자물쇠 → 권한 → 알림을 ‘허용’으로 바꿔 주세요." };
   }
   try {
-    const reg = await sw();
+    const reg = await registerSW();
     const sub =
       (await reg.pushManager.getSubscription()) ??
       (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: base64ToBytes(VAPID!) }));
@@ -58,7 +53,7 @@ export async function enablePush(): Promise<{ ok: true } | { ok: false; error: s
 
 export async function disablePush(): Promise<{ ok: true } | { ok: false; error: string }> {
   try {
-    const sub = await (await sw()).pushManager.getSubscription();
+    const sub = await (await registerSW()).pushManager.getSubscription();
     if (!sub) return { ok: true };
     const { error } = await supabase().from("push_subscriptions").delete().eq("endpoint", sub.endpoint);
     if (error) throw error;
@@ -74,7 +69,7 @@ export async function disablePush(): Promise<{ ok: true } | { ok: false; error: 
 export async function refreshPush() {
   if (!pushSupported() || Notification.permission !== "granted") return;
   try {
-    const sub = await (await sw()).pushManager.getSubscription();
+    const sub = await (await registerSW()).pushManager.getSubscription();
     if (sub) await saveSubscription(sub);
   } catch (e) {
     console.error("[push] refresh failed", e);

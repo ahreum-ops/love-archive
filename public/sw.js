@@ -1,7 +1,33 @@
-// 러브아카이브 서비스워커 — 푸시 알림만 다룬다 (오프라인 캐시 없음)
+// 러브아카이브 서비스워커 — 푸시 알림 + 갤러리 공유 받기 (오프라인 캐시 없음)
 
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (e) => e.waitUntil(self.clients.claim()));
+
+// 갤러리에서 '공유 → 러브아카이브' 하면 manifest 의 share_target 대로 /share 에 사진이 POST 된다.
+// 받은 사진을 캐시에 잠깐 넣어 두고 사진첩으로 보내면, 사진첩이 꺼내서 올리기 시트를 띄우고 지운다.
+const SHARE_CACHE = "shared-photos";
+
+self.addEventListener("fetch", (e) => {
+  const url = new URL(e.request.url);
+  if (e.request.method !== "POST" || url.origin !== self.location.origin || url.pathname !== "/share") return;
+  e.respondWith(
+    (async () => {
+      try {
+        const form = await e.request.formData();
+        const files = form.getAll("photos").filter((f) => f instanceof File && f.type.startsWith("image/"));
+        await caches.delete(SHARE_CACHE);
+        const cache = await caches.open(SHARE_CACHE);
+        await Promise.all(
+          files.map((f, i) => cache.put(`/shared/${i}`, new Response(f, { headers: { "content-type": f.type } }))),
+        );
+        return Response.redirect(`/album?shared=${files.length}`, 303);
+      } catch (err) {
+        console.error("[sw] share failed", err);
+        return Response.redirect("/album?shared=0", 303);
+      }
+    })(),
+  );
+});
 
 self.addEventListener("push", (e) => {
   let data = {};

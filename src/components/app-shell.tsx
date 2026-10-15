@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect } from "react";
 import { clearSyncError, useAppState, useSession, useSyncError } from "@/lib/store";
 import { REMOTE } from "@/lib/supabase";
+import { registerSW, swSupported } from "@/lib/sw";
 import Login, { ResetPassword } from "./login";
 import Setup from "./setup";
 import { Banner } from "./ui";
@@ -23,6 +24,11 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const session = useSession();
   const syncError = useSyncError();
   const pathname = usePathname();
+
+  // 갤러리 공유 받기·푸시 알림용. 등록돼 있어야 설치한 앱이 공유 목록에 뜬다
+  useEffect(() => {
+    if (swSupported()) registerSW().catch((e) => console.error("[sw] register failed", e));
+  }, []);
 
   // 서버 모드: 로그인 → 커플 만들기/코드로 들어가기. 체험 모드: 프로필이 없으면 바로 만들기
   const gate = REMOTE

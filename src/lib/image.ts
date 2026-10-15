@@ -1,5 +1,5 @@
 /** 사진을 긴 변 maxSize px 의 JPEG data URL 로 줄인다 (저장 공간 절약) */
-export async function compressImage(file: File, maxSize = 720, quality = 0.72): Promise<string> {
+export async function compressImage(file: Blob, maxSize = 720, quality = 0.72): Promise<string> {
   const url = URL.createObjectURL(file);
   try {
     const img = await new Promise<HTMLImageElement>((resolve, reject) => {
