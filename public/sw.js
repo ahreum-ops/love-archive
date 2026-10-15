@@ -5,29 +5,53 @@ self.addEventListener("activate", (e) => e.waitUntil(self.clients.claim()));
 
 // 갤러리에서 '공유 → 러브아카이브' 하면 manifest 의 share_target 대로 /share 에 사진이 POST 된다.
 // 받은 사진을 캐시에 잠깐 넣어 두고 사진첩으로 보내면, 사진첩이 꺼내서 올리기 시트를 띄우고 지운다.
+// 캐시에 넣다 실패하면 메모리에 들고 있다가 사진첩이 메시지(take-shared)로 달라고 할 때 넘긴다.
 const SHARE_CACHE = "shared-photos";
+let sharedInMemory = [];
 
 self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== "POST" || url.origin !== self.location.origin || url.pathname !== "/share") return;
-  e.respondWith(
-    (async () => {
-      try {
-        const form = await e.request.formData();
-        // 갤러리에 따라 type 이 비어 오기도 해서 형식은 보지 않는다 (manifest accept 가 이미 사진만 고름)
-        const files = form.getAll("photos").filter((f) => f instanceof File && f.size > 0);
-        await caches.delete(SHARE_CACHE);
-        const cache = await caches.open(SHARE_CACHE);
-        await Promise.all(
-          files.map((f, i) => cache.put(`/shared/${i}`, new Response(f, { headers: { "content-type": f.type } }))),
-        );
-        return Response.redirect(`/album?shared=${files.length}`, 303);
-      } catch (err) {
-        console.error("[sw] share failed", err);
-        return Response.redirect("/album?shared=error", 303);
-      }
-    })(),
-  );
+  e.respondWith(receiveShare(e.request));
+});
+
+async function receiveShare(request) {
+  const album = (params) => Response.redirect(new URL(`/album?${new URLSearchParams(params)}`, self.location.origin).href, 303);
+  // 어느 단계에서 왜 실패했는지 사진첩 안내에 그대로 보여 준다
+  const why = (step, err) => `${step}: ${(err && (err.name || "")) + " " + (err && err.message ? err.message : String(err))}`.slice(0, 160);
+
+  let files;
+  try {
+    const form = await request.formData();
+    // 갤러리에 따라 type 이 비어 오기도 해서 형식은 보지 않는다 (manifest accept 가 이미 사진만 고름)
+    files = [...form.values()].filter((f) => typeof f === "object" && f.size > 0);
+  } catch (err) {
+    console.error("[sw] share formData failed", err);
+    return album({ shared: "error", why: why("form", err) });
+  }
+
+  sharedInMemory = files;
+  try {
+    await caches.delete(SHARE_CACHE);
+    const cache = await caches.open(SHARE_CACHE);
+    for (let i = 0; i < files.length; i++) {
+      // 파일을 먼저 다 읽어서 넣는다 (갤러리 파일을 나중에 읽으면 실패하는 기기가 있음)
+      const body = await files[i].arrayBuffer();
+      await cache.put(`/shared/${i}`, new Response(body, { headers: { "content-type": files[i].type || "image/jpeg" } }));
+    }
+    sharedInMemory = [];
+    return album({ shared: String(files.length) });
+  } catch (err) {
+    console.error("[sw] share cache failed", err);
+    await caches.delete(SHARE_CACHE).catch(() => undefined);
+    return album({ shared: String(files.length), why: why("cache", err) });
+  }
+}
+
+self.addEventListener("message", (e) => {
+  if (e.data !== "take-shared" || !e.ports[0]) return;
+  e.ports[0].postMessage(sharedInMemory);
+  sharedInMemory = [];
 });
 
 self.addEventListener("push", (e) => {

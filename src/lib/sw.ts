@@ -16,13 +16,27 @@ export function swSupported(): boolean {
 
 const SHARE_CACHE = "shared-photos"; // public/sw.js 와 같은 이름
 
-/** 서비스워커가 받아 둔 공유 사진을 꺼내고 비운다 */
+/** 서비스워커가 받아 둔 공유 사진을 꺼내고 비운다 (캐시 → 없으면 서비스워커 메모리) */
 export async function takeSharedPhotos(): Promise<Blob[]> {
-  if (!("caches" in window) || !(await caches.has(SHARE_CACHE))) return [];
+  if (!("caches" in window) || !(await caches.has(SHARE_CACHE))) return takeFromWorker();
   const cache = await caches.open(SHARE_CACHE);
   const keys = [...(await cache.keys())];
   keys.sort((a, b) => Number(a.url.split("/").pop()) - Number(b.url.split("/").pop()));
   const blobs = await Promise.all(keys.map(async (k) => (await cache.match(k))!.blob()));
   await caches.delete(SHARE_CACHE);
   return blobs;
+}
+
+async function takeFromWorker(): Promise<Blob[]> {
+  const worker = navigator.serviceWorker?.controller;
+  if (!worker) return [];
+  return new Promise((resolve) => {
+    const channel = new MessageChannel();
+    const timer = setTimeout(() => resolve([]), 3000);
+    channel.port1.onmessage = (e) => {
+      clearTimeout(timer);
+      resolve(Array.isArray(e.data) ? e.data : []);
+    };
+    worker.postMessage("take-shared", [channel.port2]);
+  });
 }
