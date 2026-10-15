@@ -25,7 +25,6 @@ export default function Home() {
   const { profile, bucket, anniversaries, balance, letters } = state;
   const partner = profile.me === "a" ? "b" : "a";
   const unread = letters.filter((l) => l.from !== profile.me && !l.readAt && !isLocked(l)).length;
-  const chatUnread = chat.messages.filter((m) => m.from !== profile.me && !m.readAt && !m.deleted).length;
   const waiting = letters.filter((l) => l.from !== profile.me && isLocked(l)).length;
 
   const days = dayCount(profile.startDate);
@@ -56,20 +55,12 @@ export default function Home() {
     <div className="space-y-4">
       <div className="flex items-center justify-between px-1">
         <WhoSwitch />
-        <div className="ml-auto flex gap-2">
-        <Link href="/chat" className="press relative rounded-full bg-white/90 p-2 text-ink-soft shadow-soft ring-1 ring-line" aria-label={chatUnread ? `채팅 (안 읽은 메시지 ${chatUnread}개)` : "채팅"}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 4.5c-4.7 0-8.5 3-8.5 6.8 0 2.2 1.3 4.2 3.3 5.4l-.6 3 3.3-1.9c.8.2 1.6.3 2.5.3 4.7 0 8.5-3 8.5-6.8S16.7 4.5 12 4.5z" />
-          </svg>
-          {chatUnread > 0 && <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-rose ring-2 ring-white" />}
-        </Link>
-        <button onClick={() => setSettings(true)} className="press rounded-full bg-white/90 p-2 text-ink-soft shadow-soft ring-1 ring-line" aria-label="설정">
+        <button onClick={() => setSettings(true)} className="press ml-auto rounded-full bg-white/90 p-2 text-ink-soft shadow-soft ring-1 ring-line" aria-label="설정">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
             <circle cx="12" cy="12" r="3" />
             <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" />
           </svg>
         </button>
-        </div>
       </div>
 
       <CoupleHero profile={profile} days={days} />

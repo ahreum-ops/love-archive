@@ -78,6 +78,17 @@ export default function ChatPage() {
     prevRef.current = { count: messages.length, last: last?.id, first: messages[0]?.id, height: el.scrollHeight };
   }, [messages, me]);
 
+  // 들어올 때마다 맨 아래부터. Next 가 전에 본 화면을 숨겨 뒀다 다시 보여 줄 때도 이 effect 가 다시 돌고,
+  // 숨겨진 동안 스크롤이 0 으로 돌아가 있어서 여기서 다시 내린다
+  useLayoutEffect(() => {
+    const el = listRef.current;
+    if (!el) return;
+    atBottom.current = true;
+    el.scrollTop = el.scrollHeight;
+    const raf = requestAnimationFrame(() => (el.scrollTop = el.scrollHeight));
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
   // 키보드가 올라와 화면이 줄어도 마지막 메시지가 보이게
   useLayoutEffect(() => {
     const el = listRef.current;
