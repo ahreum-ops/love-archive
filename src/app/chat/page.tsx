@@ -16,7 +16,6 @@ import {
   react,
   retryMessage,
   sendMessage,
-  setViewing,
   unsend,
   useChat,
   type Message,
@@ -50,11 +49,7 @@ export default function ChatPage() {
   const me = state?.profile?.me;
   const messages = chat.messages;
 
-  // 이 화면을 보는 동안은 상대에게 푸시가 안 가게 알리고, 상대 메시지는 읽음으로
-  useEffect(() => {
-    setViewing(true);
-    return () => setViewing(false);
-  }, []);
+  // 이 화면을 보는 동안 상대 메시지는 읽음으로
   useEffect(() => {
     if (!me) return;
     const read = () => document.visibilityState === "visible" && void markRead(me);

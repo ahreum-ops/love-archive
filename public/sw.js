@@ -101,14 +101,22 @@ self.addEventListener("push", (e) => {
     data = { body: e.data && e.data.text() };
   }
   e.waitUntil(
-    self.registration.showNotification(data.title || "러브아카이브", {
-      body: data.body || "",
-      icon: "/apple-icon",
-      // 같은 종류는 하나로 합쳐서 알림이 쌓이지 않게 (renotify 로 소리는 다시)
-      tag: data.tag,
-      renotify: Boolean(data.tag),
-      data: { url: data.url || "/" },
-    }),
+    (async () => {
+      // 이 기기에서 지금 채팅 화면을 보고 있으면 채팅 알림은 띄우지 않는다 (화면에 바로 보이니까).
+      // 보고 있지 않으면 꼭 띄워야 한다 — 안 띄우면 크롬이 '백그라운드에서 업데이트됨' 알림을 대신 띄운다.
+      if (data.tag === "chat") {
+        const wins = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+        if (wins.some((w) => w.visibilityState === "visible" && w.focused && new URL(w.url).pathname === "/chat")) return;
+      }
+      await self.registration.showNotification(data.title || "러브아카이브", {
+        body: data.body || "",
+        icon: "/apple-icon",
+        // 같은 종류는 하나로 합쳐서 알림이 쌓이지 않게 (renotify 로 소리는 다시)
+        tag: data.tag,
+        renotify: Boolean(data.tag),
+        data: { url: data.url || "/" },
+      });
+    })(),
   );
 });
 

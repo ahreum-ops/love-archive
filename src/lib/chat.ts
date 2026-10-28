@@ -4,7 +4,8 @@
 // - 체험 모드: 이 기기 localStorage 에 메시지 배열로. 보내는 사람은 profile.me (WhoSwitch 로 바꿔 가며 테스트).
 // - 서버 모드: Supabase messages 테이블. 최근 PAGE 개씩 불러오고, 실시간으로 새 메시지·읽음·반응을 받는다.
 //   보내기는 화면에 먼저 띄우고(낙관적) 뒤에서 insert. 실패하면 메시지에 '다시 보내기'가 붙는다.
-//   상대가 채팅 화면을 보고 있으면(presence) 푸시는 보내지 않는다.
+//   보내기·반응·보내기 취소마다 연인에게 푸시. 연인이 그 기기에서 채팅 화면을 보고 있으면 서비스워커가 알림을 띄우지 않는다
+//   (예전엔 presence 로 보내는 쪽에서 걸렀는데, 폰을 끄거나 다른 기기에 채팅 화면이 열려 있으면 알림이 계속 막혔다).
 
 import { useEffect, useSyncExternalStore } from "react";
 import { sendPush } from "./push";
@@ -123,6 +124,8 @@ export async function react(me: Who, id: string, emoji: string | null) {
     console.error("[chat] react failed", error);
     patch(id, { reactions: before });
     set({ error: friendly(error, "반응을 남기지 못했어요.") });
+  } else if (emoji) {
+    void notify(me, "", `${preview(msg)}에 ${emoji} 반응을 남겼어요`);
   }
 }
 
@@ -136,6 +139,8 @@ export async function unsend(id: string) {
     console.error("[chat] unsend failed", error);
     if (before) patch(id, before);
     set({ error: friendly(error, "보내기를 취소하지 못했어요.") });
+  } else if (before) {
+    void notify(before.from, "", "메시지 보내기를 취소했어요");
   }
 }
 
@@ -226,9 +231,6 @@ const COLS = "id, sender, body, photo, reactions, read_at, deleted, created_at";
 
 let remoteId: string | null = null;
 let channel: ReturnType<ReturnType<typeof supabase>["channel"]> | null = null;
-let subscribed = false;
-/** 이 기기에서 채팅 화면을 보고 있는지 (presence 로 상대에게 알림 → 상대는 푸시를 안 보냄) */
-let viewing = false;
 
 function fromRow(r: Row): Message {
   return {
@@ -265,30 +267,23 @@ function startRemote(coupleId: string) {
   if (remoteId === coupleId) return;
   if (channel) void supabase().removeChannel(channel);
   remoteId = coupleId;
-  subscribed = false;
   view = { messages: [], loading: true, hasMore: false, loadingOlder: false, error: null };
-  const s = currentSession();
-  const who = s.status === "ready" ? s.who : "a";
   const apply = (row: Row) => set({ messages: merge(view.messages, [fromRow(row)]) });
   channel = supabase()
-    .channel(`chat-${coupleId}`, { config: { presence: { key: who } } })
+    .channel(`chat-${coupleId}`)
     .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages", filter: `couple_id=eq.${coupleId}` }, (p) => apply(p.new as Row))
     // 읽음 처리는 아직 안 불러온 옛 메시지도 바꾸니, 화면에 있는 것만 반영 (중간이 빈 채로 끼어들지 않게)
     .on("postgres_changes", { event: "UPDATE", schema: "public", table: "messages", filter: `couple_id=eq.${coupleId}` }, (p) => {
       const row = p.new as Row;
       if (view.messages.some((m) => m.id === row.id)) apply(row);
     })
-    .subscribe((status) => {
-      subscribed = status === "SUBSCRIBED";
-      if (subscribed) void track();
-    });
+    .subscribe();
   void refresh();
   if (!visibilityHooked) {
     visibilityHooked = true;
     // 폰은 백그라운드에서 실시간 연결이 끊기므로 돌아오면 최근 대화를 다시 받는다
     document.addEventListener("visibilitychange", () => {
       if (document.visibilityState === "visible" && remoteId) void refresh();
-      void track();
     });
   }
   emitAll();
@@ -340,7 +335,7 @@ async function insertRemote(msg: Message) {
       .single();
     if (error) throw error;
     set({ messages: merge(view.messages.filter((m) => m.id !== msg.id), [fromRow(data as Row)]) });
-    void notify(msg.from, msg.body, Boolean(photo));
+    void notify(msg.from, msg.body, photo ? "📷 사진을 보냈어요" : "");
   } catch (e) {
     console.error("[chat] send failed", e);
     patch(msg.id, { status: "failed" });
@@ -348,34 +343,18 @@ async function insertRemote(msg: Message) {
   }
 }
 
-async function notify(me: Who, body: string, photo: boolean) {
+/** 연인에게 채팅 푸시. body 가 없으면 what 을 보여 준다 */
+async function notify(me: Who, body: string, what: string) {
   const s = currentSession();
-  if (s.status !== "ready" || !s.partnerJoined || partnerViewing(me)) return;
+  if (s.status !== "ready" || !s.partnerJoined) return;
   const name = currentState()?.profile?.names[me] ?? "연인";
-  await sendPush({ title: `💬 ${name}`, body: body || (photo ? "📷 사진을 보냈어요" : ""), url: "/chat", tag: "chat" });
+  await sendPush({ title: `💬 ${name}`, body: body || what, url: "/chat", tag: "chat" });
 }
 
-function partnerViewing(me: Who): boolean {
-  if (!channel || !subscribed) return false;
-  const partner = me === "a" ? "b" : "a";
-  const states = channel.presenceState<{ viewing?: boolean }>()[partner] ?? [];
-  return states.some((s) => s.viewing);
-}
-
-async function track() {
-  if (!channel || !subscribed) return;
-  const on = viewing && document.visibilityState === "visible";
-  try {
-    await channel.track({ viewing: on });
-  } catch (e) {
-    console.error("[chat] presence failed", e);
-  }
-}
-
-/** 채팅 화면이 열리고 닫힐 때 부른다 */
-export function setViewing(on: boolean) {
-  viewing = on;
-  void track();
+/** 알림에 보여 줄 메시지 요약 */
+function preview(m: Message): string {
+  const text = m.body.length > 30 ? `${m.body.slice(0, 30)}…` : m.body;
+  return text ? `‘${text}’` : m.photo ? "사진" : "메시지";
 }
 
 function friendly(e: { message?: string; code?: string }, what: string): string {
