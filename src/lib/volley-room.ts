@@ -8,11 +8,11 @@
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
 import type { Who } from "./types";
-import type { Snapshot } from "./volley";
+import type { RemoteCat, Snapshot } from "./volley";
 
 export const SEND_HZ = 15;
 
-export type CatMsg = { x: number; y: number; vx: number; vy: number; k: 0 | 1 };
+export type CatMsg = RemoteCat;
 
 export type RoomEvents = {
   onPresence: (partner: { here: boolean; ready: boolean }) => void;

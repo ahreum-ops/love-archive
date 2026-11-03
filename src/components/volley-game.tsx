@@ -11,7 +11,7 @@ import CatSprite from "./cat-sprite";
 import { josa } from "@/lib/josa";
 import type { CatLook } from "@/lib/types";
 import {
-  aiInput, applySnapshot, BALL_R, CAT_R, coastBall, FLOOR, H, NET_HALF, NET_TOP, NET_X, newWorld, NO_INPUT, snapshot, step, stepCat,
+  aiInput, applySnapshot, BALL_R, CAT_R, coastBall, FLOOR, H, NET_HALF, NET_TOP, NET_X, newWorld, NO_INPUT, snapshot, step, stepCat, syncRemoteCat,
   W, WIN, type Input, type Phase, type Snapshot, type World,
 } from "@/lib/volley";
 import { SEND_HZ, type CatMsg, type VolleyRoom } from "@/lib/volley-room";
@@ -110,12 +110,7 @@ export default function VolleyGame({
     if (mode.kind === "host") {
       inbox.onCat = (m) => {
         lastHeard = performance.now();
-        const c = w.cats[other];
-        c.x = m.x;
-        c.y = m.y;
-        c.vx = m.vx;
-        c.vy = m.vy;
-        if (m.k && c.spike <= 0) c.spike = 0.28;
+        syncRemoteCat(w.cats[other], m);
       };
     } else if (mode.kind === "guest") {
       inbox.onState = (s) => {

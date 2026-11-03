@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "check:volley": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/volley-check.ts",
+    "check:snake": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/snake-check.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.3",

@@ -25,7 +25,13 @@ const SPIKE_WINDOW = 0.28;
 export type Input = { left: boolean; right: boolean; jump: boolean };
 export const NO_INPUT: Input = { left: false, right: false, jump: false };
 
-export type Cat = { x: number; y: number; vx: number; vy: number; spike: number; cool: number };
+export type Cat = {
+  x: number; y: number; vx: number; vy: number; spike: number; cool: number;
+  /** 원격 냥이: 지난번에 받은 스파이크 버튼 상태 (누른 순간에만 스파이크를 켜려고) */
+  k?: 0 | 1;
+};
+/** 상대 기기가 보내 주는 냥이 상태 */
+export type RemoteCat = { x: number; y: number; vx: number; vy: number; k: 0 | 1 };
 export type Phase = "count" | "play" | "point" | "over";
 
 export type World = {
@@ -79,22 +85,54 @@ export function stepCat(c: Cat, input: Input, side: 0 | 1, dt: number, frozen = 
     c.y = ground;
     c.vy = 0;
   }
+  clampSide(c, side);
+  c.spike = Math.max(0, c.spike - dt);
+  c.cool = Math.max(0, c.cool - dt);
+}
+
+function clampSide(c: Cat, side: 0 | 1) {
   const min = side === 0 ? CAT_R : NET_X + NET_HALF + CAT_R;
   const max = side === 0 ? NET_X - NET_HALF - CAT_R : W - CAT_R;
   c.x = Math.min(max, Math.max(min, c.x));
+}
+
+/** 호스트: 상대 기기가 보낸 냥이 상태를 넣는다 (15Hz). 스파이크는 버튼을 누른 순간에만 켠다 */
+export function syncRemoteCat(c: Cat, m: RemoteCat) {
+  c.x = m.x;
+  c.y = m.y;
+  c.vx = m.vx;
+  c.vy = m.vy;
+  if (m.k && !c.k && c.spike <= 0) c.spike = SPIKE_WINDOW;
+  c.k = m.k;
+}
+
+/**
+ * 호스트: 받은 위치 사이사이 원격 냥이를 받은 속도로 이어 움직이고, 쿨타임·스파이크 시간도 줄인다.
+ * (예전엔 이걸 안 해서 공을 한 번 치고 생긴 쿨타임이 영영 안 풀려, 상대는 두 번째 공부터 못 막았다)
+ */
+export function coastRemoteCat(c: Cat, side: 0 | 1, dt: number) {
+  c.vy += GRAVITY * dt;
+  c.x += c.vx * dt;
+  c.y += c.vy * dt;
+  if (c.y > ground) {
+    c.y = ground;
+    c.vy = 0;
+  }
+  clampSide(c, side);
   c.spike = Math.max(0, c.spike - dt);
   c.cool = Math.max(0, c.cool - dt);
 }
 
 /**
  * 한 프레임 진행 (호스트·연습 모드). inputs 는 냥이별 입력.
- * remote 로 준 냥이는 상대 기기가 보내 준 위치를 그대로 쓰므로 여기서 움직이지 않는다.
+ * remote 로 준 냥이는 상대 기기가 보낸 상태(syncRemoteCat)를 쓰고, 사이사이는 coastRemoteCat 으로 이어 간다.
  */
 export function step(w: World, inputs: [Input, Input], dt: number, remote?: 0 | 1) {
   w.hit = null;
   const frozen = w.phase === "over";
   for (const side of [0, 1] as const) {
     if (side !== remote) stepCat(w.cats[side], inputs[side], side, dt, frozen);
+    else coastRemoteCat(w.cats[side], side, dt);
   }
 
   if (w.phase === "count" || w.phase === "point") {
