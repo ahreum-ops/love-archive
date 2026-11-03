@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { today } from "@/lib/dates";
-import { disablePush, enablePush, pushStatus, type PushStatus } from "@/lib/push";
+import { disablePush, enablePush, pushStatus, sendPush, type PushStatus } from "@/lib/push";
 import { resetAll, signOut, update, useAppState, useSession } from "@/lib/store";
 import { REMOTE } from "@/lib/supabase";
 import { Banner, Button, Field, Sheet, inputClass } from "./ui";
@@ -143,7 +143,7 @@ function PushToggle() {
           <p className="font-cute text-ink">이 기기로 알림 받기 🔔</p>
           <p className="mt-1 text-xs">
             {status === "on"
-              ? `${other}님이 편지·버킷리스트·장소를 남기면 알려 드려요`
+              ? `${other}님이 채팅을 보내거나 무엇을 남기고 고치면 알려 드려요`
               : status === "denied"
                 ? "알림이 차단돼 있어요. 주소창 왼쪽 자물쇠 → 권한 → 알림을 ‘허용’으로 바꾼 뒤 새로고침해 주세요."
                 : status === "unsupported"
@@ -164,6 +164,55 @@ function PushToggle() {
           </button>
         )}
       </div>
+      <PushTest mine={status === "on"} other={other} />
+    </div>
+  );
+}
+
+/** 알림 시험: 내 기기들 / 연인 기기들로 보내 보고, 몇 대에 갔는지·왜 실패했는지 보여 준다 */
+function PushTest({ mine, other }: { mine: boolean; other: string }) {
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<string | null>(null);
+
+  async function test(to?: "me") {
+    setBusy(true);
+    setResult(null);
+    const r = await sendPush(
+      to === "me"
+        ? { title: "🔔 알림 시험", body: "이 알림이 보이면 이 기기는 알림을 잘 받고 있어요", url: "/", tag: "test" }
+        : { title: "🔔 알림 시험", body: "연인이 보낸 시험 알림이에요. 잘 보이면 답장해 주세요 💞", url: "/chat", tag: "test" },
+      to,
+    );
+    setBusy(false);
+    if ("error" in r) return setResult(r.error);
+    const who = to === "me" ? "내" : `${other}님`;
+    if (r.devices === 0) {
+      return setResult(
+        to === "me"
+          ? "알림 받기가 켜진 내 기기가 서버에 없어요. 위 스위치를 껐다 다시 켜 주세요."
+          : `${other}님 기기 중 알림 받기가 켜진 곳이 없어요. ${other}님 폰에서 설정 → ‘이 기기로 알림 받기’를 켜 달라고 해 주세요.`,
+      );
+    }
+    const fails = r.failed.map((f) => `${f.status || "?"}${f.removed ? "(지움)" : ""} ${f.reason}`.trim());
+    setResult(
+      r.failed.length
+        ? `${who} 기기 ${r.devices}대 중 ${r.sent}대에 보냈고 ${r.failed.length}대는 실패했어요: ${fails.join(" / ")}. 실패한 기기는 앱을 다시 열면 새로 구독돼요.`
+        : `${who} 기기 ${r.sent}대에 보냈어요. 그래도 안 뜨면 그 폰의 설정 → 알림 → 크롬(또는 러브아카이브) 알림이 켜져 있는지, 방해 금지·절전 모드인지 확인해 주세요.`,
+    );
+  }
+
+  return (
+    <div className="mt-3 border-t border-line pt-3">
+      <p className="text-xs">알림이 안 오면 눌러서 확인해 보세요</p>
+      <div className="mt-2 flex gap-2">
+        <button disabled={busy || !mine} onClick={() => void test("me")} className="press rounded-full bg-white px-3 py-1.5 text-xs text-ink disabled:opacity-50">
+          내 기기로 시험
+        </button>
+        <button disabled={busy} onClick={() => void test()} className="press rounded-full bg-white px-3 py-1.5 text-xs text-ink disabled:opacity-50">
+          {other}님에게 시험
+        </button>
+      </div>
+      {(busy || result) && <p className="mt-2 text-xs text-ink">{busy ? "보내는 중…" : result}</p>}
     </div>
   );
 }

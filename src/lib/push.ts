@@ -41,11 +41,7 @@ export async function enablePush(): Promise<{ ok: true } | { ok: false; error: s
     return { ok: false, error: "알림이 차단돼 있어요. 주소창 왼쪽 자물쇠 → 권한 → 알림을 ‘허용’으로 바꿔 주세요." };
   }
   try {
-    const reg = await registerSW();
-    const sub =
-      (await reg.pushManager.getSubscription()) ??
-      (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: base64ToBytes(VAPID!) }));
-    return await saveSubscription(sub);
+    return await saveSubscription(await subscribe(await registerSW()));
   } catch (e) {
     console.error("[push] subscribe failed", e);
     return { ok: false, error: "알림을 켜지 못했어요. 인터넷 연결을 확인하고 다시 시도해 주세요." };
@@ -66,12 +62,33 @@ export async function disablePush(): Promise<{ ok: true } | { ok: false; error: 
   }
 }
 
-/** 로그인할 때마다 이 기기 구독을 다시 저장 (다른 계정으로 바뀌었거나 브라우저가 구독을 갱신했을 때) */
+/**
+ * 이 기기 구독. 지금 VAPID 키가 아닌 키로 만든 구독은 푸시 서버가 403 으로 거절하니 새로 만든다
+ * (키를 바꾼 적이 있으면 예전 구독은 '켜짐'으로 보여도 알림이 안 온다).
+ */
+async function subscribe(reg: ServiceWorkerRegistration): Promise<PushSubscription> {
+  const key = base64ToBytes(VAPID!);
+  const sub = await reg.pushManager.getSubscription();
+  if (sub && sameKey(sub.options.applicationServerKey, key)) return sub;
+  if (sub) await sub.unsubscribe();
+  return reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
+}
+
+function sameKey(a: ArrayBuffer | null, b: Uint8Array): boolean {
+  if (!a) return false;
+  const x = new Uint8Array(a);
+  return x.length === b.length && x.every((v, i) => v === b[i]);
+}
+
+/**
+ * 앱이 열릴 때마다 이 기기 구독을 다시 저장 (다른 계정으로 바뀌었거나, 브라우저가 구독을 갱신했거나,
+ * 서버가 못 쓰는 구독이라 지웠을 때)
+ */
 export async function refreshPush() {
   if (!pushSupported() || Notification.permission !== "granted") return;
   try {
-    const sub = await (await registerSW()).pushManager.getSubscription();
-    if (sub) await saveSubscription(sub);
+    const reg = await registerSW();
+    if (await reg.pushManager.getSubscription()) await saveSubscription(await subscribe(reg));
   } catch (e) {
     console.error("[push] refresh failed", e);
   }
@@ -97,20 +114,31 @@ export async function notifyPartner(before: AppState, after: AppState, me: Who) 
   if (payload) await sendPush(payload);
 }
 
+/** /api/push 응답: 받을 기기 수, 보낸 수, 실패한 기기들 */
+export type PushResult = { devices: number; sent: number; failed: { status: number; reason: string; removed: boolean }[] };
+
 /** 연인 기기들로 알림 보내기. 알림이 안 가도 저장은 된 것이라 실패는 기록만 남긴다 */
-export async function sendPush(payload: PushPayload) {
+export async function sendPush(payload: PushPayload, to?: "me"): Promise<PushResult | { error: string }> {
   try {
     const { data } = await supabase().auth.getSession();
     const token = data.session?.access_token;
-    if (!token) return;
+    if (!token) return { error: "로그인이 풀렸어요. 다시 로그인해 주세요." };
     const res = await fetch("/api/push", {
       method: "POST",
       headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ ...payload, to }),
     });
-    if (!res.ok) console.error("[push] send failed", res.status, await res.text());
+    if (!res.ok) {
+      const text = await res.text();
+      console.error("[push] send failed", res.status, text);
+      return { error: `알림 서버 오류 (${res.status}) ${text.slice(0, 120)}` };
+    }
+    const result = (await res.json()) as PushResult;
+    if (result.failed?.length) console.error("[push] some devices failed", result.failed);
+    return result;
   } catch (e) {
     console.error("[push] send failed", e);
+    return { error: "알림을 보내지 못했어요. 인터넷 연결을 확인해 주세요." };
   }
 }
 

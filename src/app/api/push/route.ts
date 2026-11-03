@@ -5,7 +5,8 @@
 import { createClient } from "@supabase/supabase-js";
 import webpush from "web-push";
 
-type Payload = { title: string; body: string; url: string; tag?: string };
+/** to: "me" 는 설정 시트의 알림 시험 — 연인 대신 내 기기들로 보낸다 */
+type Payload = { title: string; body: string; url: string; tag?: string; to?: "me" };
 
 export async function POST(req: Request) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -38,41 +39,44 @@ export async function POST(req: Request) {
   const { data: user, error: userError } = await sb.auth.getUser(token);
   if (userError || !user.user) return Response.json({ error: "not_signed_in" }, { status: 401 });
 
-  // 내 커플의 구독 중 내 것이 아닌 것 = 연인 기기들
-  const { data: subs, error } = await sb
-    .from("push_subscriptions")
-    .select("endpoint, p256dh, auth")
-    .neq("user_id", user.user.id);
+  // 내 커플의 구독 중 내 것이 아닌 것 = 연인 기기들. 알림 시험(to: "me")이면 내 기기들
+  const mine = sb.from("push_subscriptions").select("endpoint, p256dh, auth");
+  const { data: subs, error } = await (payload.to === "me" ? mine.eq("user_id", user.user.id) : mine.neq("user_id", user.user.id));
   if (error) {
     console.error("[push] read subscriptions failed", error);
     return Response.json({ error: "read_failed" }, { status: 500 });
   }
 
   webpush.setVapidDetails(new URL(req.url).origin, vapidPublic, vapidPrivate);
-  const body = JSON.stringify(payload);
+  const body = JSON.stringify({ title: payload.title, body: payload.body, url: payload.url, tag: payload.tag });
   const results = await Promise.all(
-    (subs ?? []).map(async (s) => {
+    (subs ?? []).map(async (s): Promise<Failure | null> => {
       try {
         await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, body, {
           TTL: 60 * 60 * 24,
           urgency: "high",
         });
-        return true;
+        return null;
       } catch (e) {
-        const status = (e as { statusCode?: number }).statusCode;
-        // 알림을 끄거나 앱 데이터를 지운 기기 → 구독 정리
-        if (status === 404 || status === 410) await sb.from("push_subscriptions").delete().eq("endpoint", s.endpoint);
-        else console.error("[push] send failed", status, e);
-        return false;
+        const err = e as { statusCode?: number; body?: string; message?: string };
+        // 알림을 끄거나 앱 데이터를 지운 기기(404·410), 다른 VAPID 키로 만든 구독(403) → 다시 쓸 수 없으니 정리.
+        // 그 기기는 앱을 열 때 refreshPush 가 새로 구독한다
+        const gone = err.statusCode === 404 || err.statusCode === 410 || err.statusCode === 403;
+        if (gone) await sb.from("push_subscriptions").delete().eq("endpoint", s.endpoint);
+        console.error("[push] send failed", err.statusCode, err.body ?? err.message);
+        return { status: err.statusCode ?? 0, reason: String(err.body || err.message || "").slice(0, 120), removed: gone };
       }
     }),
   );
-  return Response.json({ sent: results.filter(Boolean).length });
+  const failed = results.filter((r): r is Failure => r !== null);
+  return Response.json({ devices: results.length, sent: results.length - failed.length, failed });
 }
+
+type Failure = { status: number; reason: string; removed: boolean };
 
 function clean(x: unknown): Payload | null {
   if (!x || typeof x !== "object") return null;
-  const { title, body, url, tag } = x as Record<string, unknown>;
+  const { title, body, url, tag, to } = x as Record<string, unknown>;
   if (typeof title !== "string" || typeof body !== "string" || typeof url !== "string") return null;
   // 앱 안 경로로만 이동하게
   if (!url.startsWith("/") || url.startsWith("//")) return null;
@@ -81,5 +85,6 @@ function clean(x: unknown): Payload | null {
     body: body.slice(0, 200),
     url,
     tag: typeof tag === "string" ? tag.slice(0, 40) : undefined,
+    to: to === "me" ? "me" : undefined,
   };
 }
