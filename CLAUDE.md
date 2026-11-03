@@ -4,6 +4,8 @@
 
 두 사람이 쓰는 커플 웹앱(PWA). HR ERP 와는 무관한 개인 프로젝트 — 회사 계정(`@we-ar.kr`)·회사 Vercel 팀을 쓰지 않는다.
 
+자세한 문서는 `docs/`(구조·기능·서버·설정/배포·이력, 목록은 `README.md`). 기능을 바꾸면 이 파일과 해당 문서를 같이 고친다.
+
 - 스택: Next.js 16 (App Router, `cacheComponents` 켜짐) + React 19 + Tailwind 4. 모든 화면은 클라이언트 컴포넌트.
 - 데이터: `src/lib/store.ts`. `NEXT_PUBLIC_SUPABASE_URL`/`ANON_KEY` 가 있으면 **서버 모드**, 없으면 **체험 모드**(localStorage).
   - 서버 모드: 커플 하나의 AppState 전체를 `couples.state`(jsonb)에 통으로 저장, `save_state(rev)` 로 낙관적 동시성 → 충돌 시 최신을 받아 같은 update fn 을 다시 적용. 실시간 구독으로 상대 변경 반영. 사진 data URL 은 저장 직전 Storage `photos` 버킷에 올려 URL 로 바꾼다. 스키마는 `supabase/schema.sql`(SQL Editor 에 붙여넣기).
