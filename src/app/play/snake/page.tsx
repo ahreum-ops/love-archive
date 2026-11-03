@@ -246,7 +246,7 @@ export default function SnakePage() {
       <div className="mt-4 rounded-[28px] border-2 border-dashed border-line bg-white/50 p-4 text-sm text-ink-soft">
         <p className="mb-1 font-cute text-base text-ink">하는 법</p>
         <p>화면 아무 데나 손가락을 대고 끌면 그쪽으로 가요.</p>
-        <p>🐾 달리기를 누르고 있으면 빨라지지만 조금씩 짧아져요.</p>
+        <p>모두 같은 속도, 같은 크기로 시작해요. 먼저 많이 먹는 냥이가 커져요.</p>
         <p>내 머리가 다른 냥이 몸이나 벽에 닿으면 끝! 다른 냥이를 내 몸에 부딪히게 하면 반짝이 사료가 쏟아져요.</p>
         <p>경쟁할 땐 연인이 화면 밖에 있으면 가장자리 보라색 화살표가 어디 있는지 알려 줘요.</p>
         <p>컴퓨터에선 마우스 쪽으로 가고, 클릭·스페이스바로 달려요.</p>

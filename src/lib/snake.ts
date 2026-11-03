@@ -1,19 +1,17 @@
 // 길쭉 냥이 — slither.io 같은 뱀 게임 엔진 (화면·네트워크와 무관한 순수 계산)
 // 둥근 맵(중심 0,0 · 반지름 ARENA)을 돌아다니며 사료를 먹고 길어진다. 내 머리가 다른 냥이 몸에 닿거나 벽에 닿으면 끝.
+// 모두 같은 속도(달리기 없음), 모두 같은 크기로 태어난다.
 // - 혼자 모드: 이 기기에서 전부 계산 (상대는 컴퓨터 냥이들)
-// - 둘이 모드: a 기기(호스트)가 전부 계산해 스냅숏을 보내고, b 는 자기 방향·달리기만 보낸다. b 는 받은 머리 위치로 몸을 그려 낸다.
+// - 둘이 모드: a 기기(호스트)가 전부 계산해 스냅숏을 보내고, b 는 자기 방향만 보낸다. b 는 받은 머리 위치로 몸을 그려 낸다.
 
 export const ARENA = 1250;
 export const SPACING = 6; // 몸 마디 사이 간격
 export const ROUND = 180; // 둘이 모드 한 판 (초)
 export const RESPAWN = 2.5;
 export const RIVAL_BONUS = 20; // 경쟁 모드: 연인을 내 몸에 부딪히게 하면 더해 주는 점수
-const SPEED = 135;
-const BOOST_SPEED = 260;
+const SPEED = 150;
 const TURN = 4.8; // 초당 회전 (길어지면 느려짐)
 const START_MASS = 10;
-const MIN_BOOST_MASS = 14;
-const BOOST_COST = 4; // 달리는 동안 초당 줄어드는 길이
 const FOOD_COUNT = 380;
 const MAGNET = 16; // 사료를 끌어당기는 거리
 
@@ -30,7 +28,6 @@ export type Snake = {
   pts: Pt[]; // 0 이 머리
   angle: number;
   target: number;
-  boost: boolean;
   mass: number;
   alive: boolean;
   /** 죽은 뒤 다시 태어나기까지 남은 시간 (Infinity 면 안 태어남 — 혼자 모드의 나) */
@@ -40,13 +37,12 @@ export type Snake = {
   deaths: number;
   /** 경쟁 모드: 연인(사람 냥이)을 잡은 횟수 */
   rivalKills: number;
-  dropT: number;
   brain: number; // 컴퓨터 냥이가 다음에 생각할 때까지
   /** 둘이 모드 b 기기: 호스트가 마지막으로 알려 준 머리 */
   net?: { x: number; y: number; a: number; at: number };
 };
 export type Food = { id: number; x: number; y: number; v: number; c: number };
-export type Control = { angle: number; boost: boolean };
+export type Control = { angle: number };
 export type GameEvent = { t: "eat"; id: number; v: number } | { t: "die"; id: number; by: number | null };
 export type Player = { id: number; name: string; look: Look };
 
@@ -93,8 +89,8 @@ function addFood(w: World, x: number, y: number, v: number, c = Math.floor(Math.
 
 function newSnake(p: Player, ai: boolean): Snake {
   return {
-    ...p, ai, pts: [], angle: 0, target: 0, boost: false, mass: START_MASS, alive: false,
-    respawn: 0, best: 0, kills: 0, deaths: 0, rivalKills: 0, dropT: 0, brain: 0,
+    ...p, ai, pts: [], angle: 0, target: 0, mass: START_MASS, alive: false,
+    respawn: 0, best: 0, kills: 0, deaths: 0, rivalKills: 0, brain: 0,
   };
 }
 
@@ -120,7 +116,6 @@ function spawn(w: World, s: Snake, mass: number) {
   s.angle = s.target = a;
   s.mass = mass;
   s.alive = true;
-  s.boost = false;
   s.pts = [];
   for (let i = 0; i < segCount(mass); i++) s.pts.push({ x: best.x - Math.cos(a) * i * SPACING, y: best.y - Math.sin(a) * i * SPACING });
 }
@@ -137,7 +132,7 @@ export function newWorld(mode: World["mode"], players: Player[], bots: number): 
   for (let i = 0; i < bots; i++) {
     const s = newSnake({ id: 10 + i, name: names[i % names.length], look: looks[i % looks.length] }, true);
     w.snakes.push(s);
-    spawn(w, s, START_MASS + Math.random() * 60);
+    spawn(w, s, START_MASS);
   }
   for (let i = 0; i < FOOD_COUNT; i++) {
     const p = randomInArena(20);
@@ -154,7 +149,6 @@ export function emptyWorld(): World {
 function kill(w: World, s: Snake, by: Snake | null) {
   s.alive = false;
   s.deaths++;
-  s.boost = false;
   s.respawn = s.ai || w.mode === "duo" ? RESPAWN : Infinity;
   if (by) by.kills++;
   if (by && !by.ai && !s.ai) by.rivalKills++;
@@ -214,7 +208,7 @@ function bbox(s: Snake): Box {
 }
 
 /**
- * 한 프레임 진행 (혼자 모드·호스트). controls 는 사람 냥이 id 별 방향·달리기.
+ * 한 프레임 진행 (혼자 모드·호스트). controls 는 사람 냥이 id 별 방향.
  * 컴퓨터 냥이는 스스로 생각한다.
  */
 export function step(w: World, dt: number, controls: Record<number, Control>) {
@@ -229,26 +223,13 @@ export function step(w: World, dt: number, controls: Record<number, Control>) {
   for (const s of w.snakes) {
     if (!s.alive) {
       s.respawn -= dt;
-      if (s.respawn <= 0) spawn(w, s, s.ai ? START_MASS + Math.random() * 30 : START_MASS);
+      if (s.respawn <= 0) spawn(w, s, START_MASS);
       continue;
     }
     if (s.ai) think(w, s, dt);
-    else if (controls[s.id]) {
-      s.target = controls[s.id].angle;
-      s.boost = controls[s.id].boost;
-    }
+    else if (controls[s.id]) s.target = controls[s.id].angle;
     turn(s, dt);
-    const boosting = s.boost && s.mass > MIN_BOOST_MASS;
-    if (boosting) {
-      s.mass -= BOOST_COST * dt;
-      s.dropT -= dt;
-      if (s.dropT <= 0) {
-        s.dropT = 0.22;
-        const tail = s.pts[s.pts.length - 1];
-        addFood(w, tail.x, tail.y, 0.6);
-      }
-    }
-    moveSnake(s, (boosting ? BOOST_SPEED : SPEED) * dt);
+    moveSnake(s, SPEED * dt);
     s.best = Math.max(s.best, lengthOf(s));
 
     // 사료 먹기
@@ -345,7 +326,6 @@ function think(w: World, s: Snake, dt: number) {
       }
     }
     s.target = bestA;
-    s.boost = ahead >= 3 && s.mass > 30 && Math.random() < 0.3;
     return;
   }
 
@@ -364,7 +344,6 @@ function think(w: World, s: Snake, dt: number) {
   }
   if (best) s.target = Math.atan2(best.y - h.y, best.x - h.x);
   else s.target = s.angle + (Math.random() - 0.5) * 1.2;
-  s.boost = Boolean(best && best.v >= 3 && s.mass > 25 && Math.random() < 0.4);
 }
 
 /** 경쟁 모드 점수 = 이번 판 최고 길이 + 연인 잡은 횟수 × RIVAL_BONUS */
@@ -380,7 +359,7 @@ export function ranking(w: World) {
 export type SnakeSnapshot = {
   t: number; // 경과 시간 * 10
   o: 0 | 1; // 끝났나
-  /** id, x, y, angle*100, mass*10, 달리기, 살아 있음, best, kills, deaths, rivalKills */
+  /** id, x, y, angle*100, mass*10, 살아 있음, best, kills, deaths, rivalKills */
   s: number[][];
   fa: number[][]; // 새 사료 id, x, y, v*10, c
   fr: number[]; // 없어진 사료 id
@@ -401,7 +380,7 @@ export function snapshot(w: World, full: boolean, events: GameEvent[]): SnakeSna
     o: w.over ? 1 : 0,
     s: w.snakes.map((s) => {
       const h = s.pts[0] ?? { x: 0, y: 0 };
-      return [s.id, r(h.x), r(h.y), r(s.angle * 100), r(s.mass * 10), s.boost ? 1 : 0, s.alive ? 1 : 0, s.best, s.kills, s.deaths, s.rivalKills];
+      return [s.id, r(h.x), r(h.y), r(s.angle * 100), r(s.mass * 10), s.alive ? 1 : 0, s.best, s.kills, s.deaths, s.rivalKills];
     }),
     fa: full ? [] : w.added.map(packFood),
     fr: full ? [] : w.removed,
@@ -437,12 +416,12 @@ export function applySnapshot(w: World, snap: SnakeSnapshot, now: number): GameE
       w.food = w.food.filter((f) => !gone.has(f.id));
     }
   }
-  for (const [id, x, y, a, mass, boost, alive, best, kills, deaths, rivalKills = 0] of snap.s) {
+  for (const [id, x, y, a, mass, alive, best, kills, deaths, rivalKills = 0] of snap.s) {
     const s = w.snakes.find((o) => o.id === id);
     if (!s) continue; // 이름·생김새를 아직 못 받음 — 다음 전체 맞추기 때
     const angle = a / 100;
     const reborn = alive === 1 && (!s.alive || !s.pts.length || Math.hypot(s.pts[0].x - x, s.pts[0].y - y) > 200);
-    Object.assign(s, { mass: mass / 10, boost: boost === 1, alive: alive === 1, best, kills, deaths, rivalKills });
+    Object.assign(s, { mass: mass / 10, alive: alive === 1, best, kills, deaths, rivalKills });
     s.net = { x, y, a: angle, at: now };
     if (!s.alive) s.pts = [];
     else if (reborn) {
@@ -469,7 +448,7 @@ export function guestStep(w: World, dt: number, now: number, myId: number, mine:
     } else {
       s.angle += angleDiff(s.angle, n.a) * 0.3;
     }
-    const speed = s.boost && s.mass > MIN_BOOST_MASS ? BOOST_SPEED : SPEED;
+    const speed = SPEED;
     const age = Math.min(0.3, (now - n.at) / 1000);
     const px = n.x + Math.cos(n.a) * speed * age;
     const py = n.y + Math.sin(n.a) * speed * age;

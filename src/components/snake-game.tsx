@@ -2,9 +2,9 @@
 
 // 길쭉 냥이 경기 화면 (캔버스). 계산은 src/lib/snake.ts, 둘이 모드 연결은 src/lib/snake-room.ts.
 // - solo: 이 기기에서 전부 계산 (컴퓨터 냥이들과)
-// - host(a): 전부 계산해 스냅숏을 보내고, b 의 방향·달리기는 받아서 쓴다
-// - guest(b): 받은 스냅숏으로 그리고, 내 방향·달리기만 보낸다 (사이사이는 혼자 굴려서 부드럽게)
-// 조작: 화면 아무 데나 끌면 그쪽으로(조이스틱), 오른쪽 아래 버튼을 누르고 있으면 달리기. 컴퓨터에선 마우스 방향 + 클릭/스페이스.
+// - host(a): 전부 계산해 스냅숏을 보내고, b 의 방향은 받아서 쓴다
+// - guest(b): 받은 스냅숏으로 그리고, 내 방향만 보낸다 (사이사이는 혼자 굴려서 부드럽게)
+// 조작: 화면 아무 데나 끌면 그쪽으로(조이스틱). 컴퓨터에선 마우스 방향, ← → 로도 돈다. 모두 같은 속도라 달리기는 없다.
 
 import { useEffect, useRef, useState } from "react";
 import {
@@ -87,7 +87,7 @@ export default function SnakeGame({
   onAgain?: () => void;
 }) {
   const canvas = useRef<HTMLCanvasElement>(null);
-  const control = useRef<Control & { keyTurn: number }>({ angle: 0, boost: false, keyTurn: 0 });
+  const control = useRef<Control & { keyTurn: number }>({ angle: 0, keyTurn: 0 });
   const stick = useRef<{ id: number; x: number; y: number; kx: number; ky: number } | null>(null);
   const [hud, setHud] = useState<Hud>(EMPTY_HUD);
   const [record, setRecord] = useState(0);
@@ -111,13 +111,12 @@ export default function SnakeGame({
     window.scrollTo(0, 0);
   }, []);
 
-  // 키보드: ← → 로 돌기, 스페이스·↑ 달리기
+  // 키보드: ← → 로 돌기
   useEffect(() => {
     const set = (e: KeyboardEvent, down: boolean) => {
       const c = control.current;
       if (e.key === "ArrowLeft" || e.key === "a") c.keyTurn = down ? -1 : c.keyTurn === -1 ? 0 : c.keyTurn;
       else if (e.key === "ArrowRight" || e.key === "d") c.keyTurn = down ? 1 : c.keyTurn === 1 ? 0 : c.keyTurn;
-      else if (e.key === " " || e.key === "ArrowUp" || e.key === "w") c.boost = down;
       else return;
       e.preventDefault();
     };
@@ -190,7 +189,7 @@ export default function SnakeGame({
     if (mode.kind === "host") {
       inbox.onInput = (m) => {
         lastHeard = performance.now();
-        remote = { angle: m.a / 100, boost: m.b === 1 };
+        remote = { angle: m.a / 100 };
       };
     } else if (mode.kind === "guest") {
       inbox.onState = (s) => {
@@ -204,7 +203,7 @@ export default function SnakeGame({
       last = now;
       const c = control.current;
       if (c.keyTurn) c.angle += c.keyTurn * 3.2 * dt;
-      const my: Control = { angle: c.angle, boost: c.boost };
+      const my: Control = { angle: c.angle };
 
       if (mode.kind === "guest") {
         guestStep(w, dt, now, me.id, my);
@@ -241,8 +240,8 @@ export default function SnakeGame({
               pending = [];
             }
           } else {
-            const msg: InputMsg = { a: Math.round(my.angle * 100), b: my.boost ? 1 : 0 };
-            const key = `${msg.a}|${msg.b}`;
+            const msg: InputMsg = { a: Math.round(my.angle * 100) };
+            const key = String(msg.a);
             // 바뀔 때만 (가만히 있어도 1초에 한 번은 살아 있다고 알린다)
             if (key !== lastSent || now - lastSentAt > 1000) {
               lastSent = key;
@@ -476,12 +475,12 @@ export default function SnakeGame({
       const n = sn.pts.length;
       const segR = (i: number) => r * (0.5 + 0.5 * Math.min(1, (n - 1 - i) / 12));
       // 외곽선 먼저 한 번에, 그 위에 털색
-      ctx!.fillStyle = sn.boost ? "rgba(232,100,140,0.45)" : "rgba(91,71,96,0.28)";
+      ctx!.fillStyle = "rgba(91,71,96,0.28)";
       for (let i = n - 1; i >= 1; i -= 1) {
         const p = sn.pts[i];
         if (!inView(p.x, p.y, r)) continue;
         ctx!.beginPath();
-        ctx!.arc(p.x, p.y, segR(i) + (sn.boost ? 3 : 1.6), 0, Math.PI * 2);
+        ctx!.arc(p.x, p.y, segR(i) + 1.6, 0, Math.PI * 2);
         ctx!.fill();
       }
       for (let i = n - 1; i >= 1; i -= 1) {
@@ -562,13 +561,13 @@ export default function SnakeGame({
         c.ellipse(sx * R * 0.6, R * 0.28, R * 0.17, R * 0.11, 0, 0, Math.PI * 2);
         c.fill();
       }
-      // 눈 (달릴 땐 신나서 ^ ^, 평소엔 가는 쪽을 본다)
+      // 눈 (가는 쪽을 보고, 가끔 눈을 깜빡인다)
       const ex = R * 0.36;
       const ey = -R * 0.12;
       const er = R * 0.2;
       const blink = Math.sin(t * 1.3 + sn.id * 7) > 0.985;
       for (const sx of [-1, 1]) {
-        if (sn.boost || blink) {
+        if (blink) {
           c.beginPath();
           c.moveTo(sx * ex - er, ey + er * 0.4);
           c.quadraticCurveTo(sx * ex, ey - er * 0.9, sx * ex + er, ey + er * 0.4);
@@ -645,10 +644,7 @@ export default function SnakeGame({
     const { rect } = center();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-    if (e.pointerType === "mouse") {
-      control.current.boost = true;
-      return;
-    }
+    if (e.pointerType === "mouse") return;
     if (stick.current) return;
     stick.current = { id: e.pointerId, x, y, kx: x, ky: y };
     try {
@@ -677,17 +673,7 @@ export default function SnakeGame({
     st.ky = st.y + dy * k;
   };
   const onUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (e.pointerType === "mouse") control.current.boost = false;
-    else if (stick.current?.id === e.pointerId) stick.current = null;
-  };
-  const boostHold = {
-    onPointerDown: (e: React.PointerEvent) => {
-      e.currentTarget.setPointerCapture(e.pointerId);
-      control.current.boost = true;
-    },
-    onPointerUp: () => (control.current.boost = false),
-    onPointerCancel: () => (control.current.boost = false),
-    onLostPointerCapture: () => (control.current.boost = false),
+    if (stick.current?.id === e.pointerId) stick.current = null;
   };
 
   const duo = mode.kind !== "solo";
@@ -754,17 +740,6 @@ export default function SnakeGame({
             </p>
           ))}
         </div>
-
-        {/* 달리기 버튼 (터치) */}
-        <button
-          {...boostHold}
-          aria-label="달리기 (누르고 있는 동안 빨라지고 조금씩 짧아져요)"
-          className="absolute bottom-4 right-4 h-20 w-20 rounded-full bg-gradient-to-br from-pink to-rose font-cute text-white shadow-pop active:scale-95"
-          style={{ touchAction: "none" }}
-        >
-          <span className="block text-2xl leading-none">🐾</span>
-          <span className="block text-xs">달리기</span>
-        </button>
 
         {/* 안내 */}
         {toast && (

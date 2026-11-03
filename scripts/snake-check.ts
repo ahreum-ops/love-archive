@@ -13,6 +13,7 @@ function check(name: string, ok: boolean) {
 {
   // 컴퓨터 냥이 9마리를 2분 동안 굴려 본다
   const w = newWorld("solo", [], 9);
+  check("컴퓨터 냥이도 모두 같은 크기로 시작", w.snakes.every((s) => s.mass === 10));
   let deaths = 0;
   let eats = 0;
   const t0 = performance.now();
@@ -37,7 +38,7 @@ function check(name: string, ok: boolean) {
   me.pts[0] = { x: 1200, y: 0 };
   let died = false;
   for (let i = 0; i < 120 && !died; i++) {
-    step(w, DT, { 1: { angle: 0, boost: false } });
+    step(w, DT, { 1: { angle: 0 } });
     died = w.events.some((e) => e.t === "die" && e.id === 1);
   }
   for (let i = 0; i < 300; i++) step(w, DT, {});
@@ -55,7 +56,7 @@ function check(name: string, ok: boolean) {
   a.pts = a.pts.map((_, i) => ({ x: 40, y: -60 - i * 6 }));
   let by: number | null = null;
   for (let i = 0; i < 120 && by === null; i++) {
-    step(w, DT, { 1: { angle: Math.PI / 2, boost: false }, 2: { angle: 0, boost: false } });
+    step(w, DT, { 1: { angle: Math.PI / 2 }, 2: { angle: 0 } });
     for (const e of w.events) if (e.t === "die" && e.id === 1) by = e.by;
   }
   check("머리가 다른 냥이 몸에 닿으면 죽고, 잡은 냥이가 기록됨", by === 2 && b.kills === 1);
@@ -79,7 +80,7 @@ function check(name: string, ok: boolean) {
     step(host, DT, {});
     pending.push(...host.events);
     now += DT * 1000;
-    guestStep(guest, DT, now, 2, { angle: 0, boost: false });
+    guestStep(guest, DT, now, 2, { angle: 0 });
     if (i % 6 === 0) {
       const snap = JSON.parse(JSON.stringify(snapshot(host, i % 180 === 0, pending)));
       pending = [];
@@ -87,6 +88,8 @@ function check(name: string, ok: boolean) {
       applySnapshot(guest, snap, now);
     }
   }
+  // 마지막 스냅숏 뒤에 호스트가 더 움직인 만큼도 보내고 나서 비교
+  applySnapshot(guest, JSON.parse(JSON.stringify(snapshot(host, false, pending))), now);
   const sameFood = guest.food.length === host.food.length;
   const heads = host.snakes.filter((s) => s.alive).map((s) => {
     const g = guest.snakes.find((x) => x.id === s.id)!;
