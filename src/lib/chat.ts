@@ -8,7 +8,7 @@
 //   (예전엔 presence 로 보내는 쪽에서 걸렀는데, 폰을 끄거나 다른 기기에 채팅 화면이 열려 있으면 알림이 계속 막혔다).
 
 import { useEffect, useSyncExternalStore } from "react";
-import { sendPush } from "./push";
+import { pushProblem, sendPush } from "./push";
 import { currentSession, currentState, uid, useSession } from "./store";
 import { REMOTE, supabase } from "./supabase";
 import type { Who } from "./types";
@@ -348,7 +348,25 @@ async function notify(me: Who, body: string, what: string) {
   const s = currentSession();
   if (s.status !== "ready" || !s.partnerJoined) return;
   const name = currentState()?.profile?.names[me] ?? "연인";
-  await sendPush({ title: `💬 ${name}`, body: body || what, url: "/chat", tag: "chat" });
+  const problem = pushProblem(await sendPush({ title: `💬 ${name}`, body: body || what, url: "/chat", tag: "chat" }));
+  // 메시지는 갔지만 알림이 안 갔다는 걸 한 번은 알려 준다 (매번 띄우면 시끄러우니 같은 까닭은 한 번만)
+  if (problem && problem !== warnedPush) {
+    warnedPush = problem;
+    set({ error: `메시지는 보냈지만 알림은 못 갔어요. ${problem}` });
+  } else if (!problem) {
+    warnedPush = null;
+  }
+}
+let warnedPush: string | null = null;
+
+/** 채팅 화면이 보이면 이 기기에 쌓인 채팅 알림을 치운다 (보고 있으니까) */
+export async function clearChatNotifications() {
+  try {
+    const reg = await navigator.serviceWorker?.getRegistration();
+    for (const n of (await reg?.getNotifications({ tag: "chat" })) ?? []) n.close();
+  } catch {
+    // 지원 안 하는 브라우저면 그냥 둔다
+  }
 }
 
 /** 알림에 보여 줄 메시지 요약 */

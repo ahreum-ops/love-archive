@@ -5,8 +5,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Banner, PageHeader } from "@/components/ui";
 import SnakeGame, { type SnakeInbox, type SnakeListen, type SnakeMode } from "@/components/snake-game";
 import { josa } from "@/lib/josa";
-import { sendPush } from "@/lib/push";
-import { RIVAL_BONUS, ROUND, type Player } from "@/lib/snake";
+import { pushProblem, sendPush } from "@/lib/push";
+import { HEAD_BONUS, RIVAL_BONUS, ROUND, type Player } from "@/lib/snake";
 import { SnakeRoom } from "@/lib/snake-room";
 import { useAppState, useSession } from "@/lib/store";
 import { REMOTE } from "@/lib/supabase";
@@ -128,7 +128,11 @@ export default function SnakePage() {
   async function invite() {
     setInvited(true);
     setTimeout(() => setInvited(false), 30_000);
-    await sendPush({ title: "🐟 길쭉 냥이", body: `${josa(names![me], "이", "가")} 길쭉 냥이 한 판 겨루재요! ⚔️`, url: "/play/snake", tag: "snake" });
+    const problem = pushProblem(await sendPush({ title: "🐟 길쭉 냥이", body: `${josa(names![me], "이", "가")} 길쭉 냥이 한 판 겨루재요! ⚔️`, url: "/play/snake", tag: "snake" }));
+    if (problem) {
+      setInvited(false);
+      setError(`알림을 못 보냈어요. ${problem}`);
+    }
   }
 
   /** finished: 판이 끝난 뒤 결과 화면에서 나감 (상대를 쫓아내지 않는다) */
@@ -170,7 +174,7 @@ export default function SnakePage() {
   return (
     <div>
       <Banner message={error} onClose={() => setError(null)} />
-      <PageHeader title="길쭉 냥이" sub="사료를 먹고 길쭉하게! 다른 냥이 몸에 머리가 닿으면 끝" />
+      <PageHeader title="길쭉 냥이" sub="사료를 먹고 길쭉하게! 작은 냥이는 꿀꺽, 큰 냥이는 조심" />
       <Link href="/play" className="mb-3 inline-block px-1 text-sm text-ink-soft">
         ‹ 놀이로
       </Link>
@@ -195,8 +199,8 @@ export default function SnakePage() {
         </div>
         <p className="mt-1 text-sm text-ink-soft">같은 맵에서 각자 폰으로 겨뤄요. 컴퓨터 냥이들도 같이 돌아다녀요.</p>
         <ul className="mt-2 space-y-0.5 text-sm text-ink">
-          <li>🐟 점수 = 이번 판에서 가장 길었을 때 길이</li>
-          <li>💥 연인을 내 몸에 부딪히게 하면 <b className="text-rose">+{RIVAL_BONUS}점</b></li>
+          <li>🐟 점수 = 이번 판에서 가장 길었을 때 길이 + 잡은 머리</li>
+          <li>😋 냥이 머리 하나에 <b className="text-rose">+{HEAD_BONUS}점</b>, 연인 머리는 <b className="text-rose">+{RIVAL_BONUS}점</b></li>
           <li>😿 부딪혀도 2초 반 뒤에 작게 다시 태어나요</li>
         </ul>
         {online ? (
@@ -247,9 +251,10 @@ export default function SnakePage() {
         <p className="mb-1 font-cute text-base text-ink">하는 법</p>
         <p>화면 아무 데나 손가락을 대고 끌면 그쪽으로 가요.</p>
         <p>모두 같은 속도, 같은 크기로 시작해요. 먼저 많이 먹는 냥이가 커져요.</p>
-        <p>내 머리가 다른 냥이 몸이나 벽에 닿으면 끝! 다른 냥이를 내 몸에 부딪히게 하면 반짝이 사료가 쏟아져요.</p>
+        <p>내 머리가 벽이나 나보다 크거나 비슷한 냥이 몸에 닿으면 끝!</p>
+        <p>내가 훨씬 크면(이름 옆 😋) 작은 냥이와 부딪혀도 안 죽고 꿀꺽 먹어요. 머리 하나에 +{HEAD_BONUS}점, 먹힌 냥이 몸은 반짝이 사료로 쏟아져요. 이름 옆 ⚠️ 는 나를 먹을 수 있는 냥이예요.</p>
         <p>경쟁할 땐 연인이 화면 밖에 있으면 가장자리 보라색 화살표가 어디 있는지 알려 줘요.</p>
-        <p>컴퓨터에선 마우스 쪽으로 가고, 클릭·스페이스바로 달려요.</p>
+        <p>컴퓨터에선 마우스 쪽으로 가요.</p>
       </div>
     </div>
   );

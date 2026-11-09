@@ -6,7 +6,7 @@ import CatSprite from "@/components/cat-sprite";
 import { Banner, PageHeader } from "@/components/ui";
 import VolleyGame, { type GameMode, type Listen, type NetInbox, type Side } from "@/components/volley-game";
 import { josa } from "@/lib/josa";
-import { sendPush } from "@/lib/push";
+import { pushProblem, sendPush } from "@/lib/push";
 import { useAppState, useSession } from "@/lib/store";
 import { REMOTE } from "@/lib/supabase";
 import { WIN } from "@/lib/volley";
@@ -115,7 +115,11 @@ export default function VolleyPage() {
   async function invite() {
     setInvited(true);
     setTimeout(() => setInvited(false), 30_000);
-    await sendPush({ title: "🧶 냥이 배구", body: `${josa(names[me], "이", "가")} 냥이 배구 한 판 하재요!`, url: "/play/volley", tag: "volley" });
+    const problem = pushProblem(await sendPush({ title: "🧶 냥이 배구", body: `${josa(names[me], "이", "가")} 냥이 배구 한 판 하재요!`, url: "/play/volley", tag: "volley" }));
+    if (problem) {
+      setInvited(false);
+      setError(`알림을 못 보냈어요. ${problem}`);
+    }
   }
 
   function exitGame() {

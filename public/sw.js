@@ -102,12 +102,10 @@ self.addEventListener("push", (e) => {
   }
   e.waitUntil(
     (async () => {
-      // 이 기기에서 지금 채팅 화면을 보고 있으면 채팅 알림은 띄우지 않는다 (화면에 바로 보이니까).
-      // 보고 있지 않으면 꼭 띄워야 한다 — 안 띄우면 크롬이 '백그라운드에서 업데이트됨' 알림을 대신 띄운다.
-      if (data.tag === "chat") {
-        const wins = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
-        if (wins.some((w) => w.visibilityState === "visible" && w.focused && new URL(w.url).pathname === "/chat")) return;
-      }
+      // 받은 푸시는 언제나 알림으로 띄운다. 예전엔 채팅 화면을 보고 있으면 건너뛰었는데,
+      // 안드로이드는 창 상태를 늦게 알려 줘서 알림이 사라지고, iOS 는 알림 없는 푸시가 몇 번 쌓이면
+      // 구독 자체를 끊어 버려서 그 뒤로 채팅·게임 초대 할 것 없이 모든 알림이 안 왔다.
+      // 채팅 화면이 열리면 그 화면이 쌓인 채팅 알림을 치운다 (chat 페이지).
       await self.registration.showNotification(data.title || "러브아카이브", {
         body: data.body || "",
         icon: "/apple-icon",

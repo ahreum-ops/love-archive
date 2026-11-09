@@ -5,6 +5,7 @@ import { Fragment, useEffect, useLayoutEffect, useRef, useState, type KeyboardEv
 import { Banner } from "@/components/ui";
 import WhoSwitch from "@/components/who-switch";
 import {
+  clearChatNotifications,
   clearChatError,
   clockLabel,
   dayLabel,
@@ -52,7 +53,11 @@ export default function ChatPage() {
   // 이 화면을 보는 동안 상대 메시지는 읽음으로
   useEffect(() => {
     if (!me) return;
-    const read = () => document.visibilityState === "visible" && void markRead(me);
+    const read = () => {
+      if (document.visibilityState !== "visible") return;
+      void markRead(me);
+      void clearChatNotifications();
+    };
     read();
     document.addEventListener("visibilitychange", read);
     return () => document.removeEventListener("visibilitychange", read);

@@ -8,7 +8,12 @@ export const ARENA = 1250;
 export const SPACING = 6; // 몸 마디 사이 간격
 export const ROUND = 180; // 둘이 모드 한 판 (초)
 export const RESPAWN = 2.5;
-export const RIVAL_BONUS = 20; // 경쟁 모드: 연인을 내 몸에 부딪히게 하면 더해 주는 점수
+export const HEAD_BONUS = 10; // 냥이 하나 잡을 때마다 (머리당) 더해 주는 점수
+export const RIVAL_BONUS = 20; // 경쟁 모드: 연인을 잡으면 (HEAD_BONUS 대신) 더해 주는 점수
+/** 이만큼 더 크면 작은 냥이와 부딪혀도 안 죽고 꿀꺽 먹는다 */
+export const EAT_RATIO = 1.2;
+/** 꿀꺽 먹으면 상대 길이의 이만큼이 바로 내 것이 된다 (몸이 사료로 쏟아지는 건 그대로) */
+export const EAT_GAIN = 0.3;
 const SPEED = 150;
 const TURN = 4.8; // 초당 회전 (길어지면 느려짐)
 const START_MASS = 10;
@@ -66,6 +71,8 @@ export const radius = (mass: number) => 8 + Math.min(16, Math.sqrt(mass) * 0.95)
 export const segCount = (mass: number) => Math.min(520, Math.round(8 + mass * 1.1));
 /** 화면에 보여 주는 길이 */
 export const lengthOf = (s: Snake) => Math.floor(s.mass);
+/** a 가 b 를 먹을 수 있을 만큼 큰가 (처음엔 모두 같은 크기라 둘 다 아님) */
+export const canEat = (a: Pick<Snake, "mass">, b: Pick<Snake, "mass">) => a.mass >= b.mass * EAT_RATIO && a.mass - b.mass >= 4;
 
 function angleDiff(a: number, b: number) {
   let d = (b - a) % (Math.PI * 2);
@@ -146,8 +153,9 @@ export function emptyWorld(): World {
   return { mode: "duo", snakes: [], food: [], nextFood: 1, time: 0, over: false, events: [], added: [], removed: [] };
 }
 
-function kill(w: World, s: Snake, by: Snake | null) {
+function kill(w: World, s: Snake, by: Snake | null, eaten = false) {
   s.alive = false;
+  if (by && eaten) by.mass += s.mass * EAT_GAIN;
   s.deaths++;
   s.respawn = s.ai || w.mode === "duo" ? RESPAWN : Infinity;
   if (by) by.kills++;
@@ -249,15 +257,20 @@ export function step(w: World, dt: number, controls: Record<number, Control>) {
     }
   }
 
-  // 부딪힘 (다 움직인 뒤 한꺼번에 — 머리끼리 박으면 둘 다)
+  // 부딪힘 (다 움직인 뒤 한꺼번에).
+  // 내 머리가 다른 냥이에 닿았을 때: 내가 훨씬 크면 그 냥이를 꿀꺽 먹고, 아니면 내가 죽는다.
+  // 크기가 비슷하면 예전처럼 머리를 박은 쪽이 죽고, 머리끼리 박으면 둘 다.
   const alive = w.snakes.filter((s) => s.alive);
   const boxes = new Map(alive.map((s) => [s, bbox(s)]));
-  const dead: [Snake, Snake | null][] = [];
+  const dead = new Map<Snake, { by: Snake | null; eaten: boolean }>();
+  const die = (s: Snake, by: Snake | null, eaten = false) => {
+    if (!dead.has(s)) dead.set(s, { by, eaten });
+  };
   for (const a of alive) {
     const h = a.pts[0];
     const ra = radius(a.mass);
     if (Math.hypot(h.x, h.y) > ARENA - ra * 0.6) {
-      dead.push([a, null]);
+      die(a, null);
       continue;
     }
     for (const b of alive) {
@@ -268,12 +281,16 @@ export function step(w: World, dt: number, controls: Record<number, Control>) {
       if (h.x < box.x0 - m || h.x > box.x1 + m || h.y < box.y0 - m || h.y > box.y1 + m) continue;
       const hit = (ra * 0.55 + rb * 0.85) ** 2;
       if (b.pts.some((p) => (p.x - h.x) ** 2 + (p.y - h.y) ** 2 < hit)) {
-        dead.push([a, b]);
-        break;
+        if (canEat(a, b)) die(b, a, true);
+        else {
+          die(a, b);
+          break;
+        }
       }
     }
   }
-  for (const [s, by] of dead) kill(w, s, by);
+  // 먹은 냥이가 같은 프레임에 죽었으면 먹은 것도 없던 일 (죽은 냥이는 안 자란다)
+  for (const [s, { by, eaten }] of dead) kill(w, s, by, eaten && by !== null && !dead.has(by));
 
   // 사료 채우기 (조금씩)
   for (let i = 0; i < 4 && w.food.length < FOOD_COUNT; i++) {
@@ -293,7 +310,7 @@ function think(w: World, s: Snake, dt: number) {
   // 주변 몸 마디만 추려 두기
   const near: { x: number; y: number; r: number }[] = [];
   for (const o of w.snakes) {
-    if (o === s || !o.alive) continue;
+    if (o === s || !o.alive || canEat(s, o)) continue; // 먹을 수 있는 작은 냥이는 무섭지 않다
     const ro = radius(o.mass);
     for (let j = 0; j < o.pts.length; j += 2) {
       const p = o.pts[j];
@@ -342,12 +359,28 @@ function think(w: World, s: Snake, dt: number) {
       best = f;
     }
   }
-  if (best) s.target = Math.atan2(best.y - h.y, best.x - h.x);
+  // 가까운 작은 냥이는 큰 사료처럼 쫓아간다
+  let prey: Pt | null = null;
+  for (const o of w.snakes) {
+    if (o === s || !o.alive || !canEat(s, o)) continue;
+    const p = o.pts[0];
+    const dx = p.x - h.x;
+    const dy = p.y - h.y;
+    if (Math.abs(dx) > 220 || Math.abs(dy) > 220) continue;
+    const score = (o.mass * 0.5) / (Math.hypot(dx, dy) + 30);
+    if (score > bestScore) {
+      bestScore = score;
+      prey = p;
+    }
+  }
+  if (prey) s.target = Math.atan2(prey.y - h.y, prey.x - h.x);
+  else if (best) s.target = Math.atan2(best.y - h.y, best.x - h.x);
   else s.target = s.angle + (Math.random() - 0.5) * 1.2;
 }
 
-/** 경쟁 모드 점수 = 이번 판 최고 길이 + 연인 잡은 횟수 × RIVAL_BONUS */
-export const duoScore = (s: Pick<Snake, "best" | "rivalKills">) => s.best + s.rivalKills * RIVAL_BONUS;
+/** 점수 = 최고 길이 + 잡은 머리 × HEAD_BONUS (연인 머리는 RIVAL_BONUS) */
+export const duoScore = (s: Pick<Snake, "best" | "kills" | "rivalKills">) =>
+  s.best + (s.kills - s.rivalKills) * HEAD_BONUS + s.rivalKills * RIVAL_BONUS;
 
 /** 순위 (길이 순) */
 export function ranking(w: World) {

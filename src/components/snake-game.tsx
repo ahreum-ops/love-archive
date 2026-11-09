@@ -8,7 +8,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
-  applySnapshot, ARENA, duoScore, emptyWorld, FOOD_COLORS, guestStep, lengthOf, newWorld, radius, RESPAWN, RIVAL_BONUS, ROUND, snapshot, step,
+  applySnapshot, ARENA, canEat, duoScore, emptyWorld, FOOD_COLORS, guestStep, HEAD_BONUS, lengthOf, newWorld, radius, RESPAWN, RIVAL_BONUS, ROUND, snapshot, step,
   type Control, type GameEvent, type Look, type Player, type Snake, type SnakeSnapshot, type World,
 } from "@/lib/snake";
 import { SNAKE_HZ, type InputMsg, type SnakeRoom } from "@/lib/snake-room";
@@ -176,10 +176,14 @@ export default function SnakeGame({
           diedAt = performance.now();
           navigator.vibrate?.([30, 40, 30]);
         } else if (e.t === "die" && e.by === me.id) navigator.vibrate?.(20);
-        // 경쟁 모드: 둘 사이에 일어난 일은 크게 알려 준다
-        if (partner && e.t === "die" && e.by === me.id && e.id === partner.id) {
+        // 잡은 머리는 점수로 바로 알려 준다 (연인 머리는 더 크게)
+        if (e.t !== "die") continue;
+        if (partner && e.by === me.id && e.id === partner.id) {
           setToast({ text: `${partner.name} 잡았다! +${RIVAL_BONUS}점 🎉`, good: true, at: performance.now() });
-        } else if (partner && e.t === "die" && e.id === me.id && e.by === partner.id) {
+        } else if (e.by === me.id) {
+          const name = w.snakes.find((x) => x.id === e.id)?.name ?? "냥이";
+          setToast({ text: `냠! ${name} 꿀꺽 +${HEAD_BONUS}점 😋`, good: true, at: performance.now() });
+        } else if (partner && e.id === me.id && e.by === partner.id) {
           setToast({ text: `${partner.name}한테 잡혔어요 😿`, good: false, at: performance.now() });
         }
       }
@@ -379,7 +383,10 @@ export default function SnakeGame({
         const h = sn.pts[0];
         if (!inView(h.x, h.y)) continue;
         const rr = radius(sn.mass) * 1.3;
-        const label = sn.id === me.id ? "나" : sn.name;
+        // 내가 먹을 수 있는 냥이 😋, 나를 먹을 수 있는 냥이 ⚠️
+        const mine = w.snakes.find((x) => x.id === me.id);
+        const tag = sn.id === me.id || !mine?.alive ? "" : canEat(mine, sn) ? " 😋" : canEat(sn, mine) ? " ⚠️" : "";
+        const label = (sn.id === me.id ? "나" : sn.name) + tag;
         ctx.lineWidth = 4;
         ctx.strokeStyle = "rgba(255,255,255,0.9)";
         ctx.strokeText(label, h.x, h.y - rr * 1.25 - 6);
@@ -630,9 +637,9 @@ export default function SnakeGame({
 
   // 혼자 모드 최고 기록
   useEffect(() => {
-    if (!hud.over || mode.kind !== "solo" || hud.best <= readBest()) return;
-    saveBest(hud.best);
-  }, [hud.over, hud.best, mode.kind]);
+    if (!hud.over || mode.kind !== "solo" || hud.score <= readBest()) return;
+    saveBest(hud.score);
+  }, [hud.over, hud.score, mode.kind]);
 
   // ---- 조작 ----
   const center = () => {
@@ -720,7 +727,7 @@ export default function SnakeGame({
             </div>
           ) : (
           <div className="rounded-2xl bg-white/85 px-3 py-1.5 text-right font-cute shadow-soft ring-1 ring-line">
-            <p className="text-lg leading-tight text-rose">🐟 {hud.len}</p>
+            <p className="text-lg leading-tight text-rose">⭐ {hud.score} <span className="text-sm text-ink-soft">🐟 {hud.len}</span></p>
             <p className="text-[11px] leading-tight text-ink-soft">
               {hud.alive ? `${hud.total}마리 중 ${hud.rank}등` : "쉬는 중"}
               {hud.left !== null && ` · ⏱ ${mm(hud.left)}`}
@@ -776,13 +783,13 @@ export default function SnakeGame({
                     <p className="text-rose">{me.name}</p>
                     <p className="text-3xl text-ink">{hud.score}<span className="text-sm text-ink-soft">점</span></p>
                     <p className="text-xs text-ink-soft">최고 길이 {hud.best}</p>
-                    <p className="text-xs text-ink-soft">연인 잡기 {hud.rivalKills}번 (+{hud.rivalKills * RIVAL_BONUS})</p>
+                    <p className="text-xs text-ink-soft">잡은 머리 {hud.kills}개 (+{hud.score - hud.best})</p>
                   </div>
                   <div className="rounded-2xl bg-white/90 p-3 ring-1 ring-line">
                     <p className="text-violet">{partner?.name}</p>
                     <p className="text-3xl text-ink">{hud.partner.score}<span className="text-sm text-ink-soft">점</span></p>
                     <p className="text-xs text-ink-soft">최고 길이 {hud.partner.best}</p>
-                    <p className="text-xs text-ink-soft">연인 잡기 {hud.partner.rivalKills}번 (+{hud.partner.rivalKills * RIVAL_BONUS})</p>
+                    <p className="text-xs text-ink-soft">잡은 머리 {hud.partner.kills}개 (+{hud.partner.score - hud.partner.best})</p>
                   </div>
                 </div>
               </>
@@ -790,10 +797,11 @@ export default function SnakeGame({
               <>
                 <p className="text-4xl">😿</p>
                 <p className="mt-1 text-2xl text-ink">부딪혀 버렸어요</p>
-                <p className="mt-1 text-sm text-ink-soft">
-                  최고 길이 <b className="text-rose">{hud.best}</b> · 잡은 냥이 {hud.kills}
+                <p className="mt-1 text-3xl text-rose">{hud.score}<span className="text-sm text-ink-soft">점</span></p>
+                <p className="text-sm text-ink-soft">
+                  최고 길이 {hud.best} + 잡은 머리 {hud.kills}개 × {HEAD_BONUS}
                 </p>
-                <p className="text-xs text-ink-soft">{hud.best > record ? "🎉 내 최고 기록!" : `내 최고 기록 ${record}`}</p>
+                <p className="text-xs text-ink-soft">{hud.score > record ? "🎉 내 최고 기록!" : `내 최고 기록 ${record}점`}</p>
               </>
             )}
             <div className="mt-4 flex gap-2">

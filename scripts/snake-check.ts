@@ -1,7 +1,7 @@
 // 길쭉 냥이 엔진 점검: 화면 없이 순수 계산만 돌려 본다.
 // 실행: npm run check:snake
 
-import { applySnapshot, duoScore, emptyWorld, guestStep, newWorld, RIVAL_BONUS, snapshot, step, type GameEvent } from "../src/lib/snake.ts";
+import { applySnapshot, duoScore, emptyWorld, guestStep, HEAD_BONUS, newWorld, RIVAL_BONUS, snapshot, step, type GameEvent, type Snake } from "../src/lib/snake.ts";
 
 const DT = 1 / 60;
 let failed = 0;
@@ -67,6 +67,40 @@ function check(name: string, ok: boolean) {
   check("연인 잡기 횟수가 스냅숏으로 전해짐", g.snakes.find((x) => x.id === 2)?.rivalKills === 1);
   for (let i = 0; i < 60 * 3; i++) step(w, DT, {});
   check("둘이 모드에선 잠깐 뒤 다시 태어남", a.alive);
+}
+
+/** b 를 가로로 눕히고 a 를 위에서 내려보내 a 머리가 b 몸에 닿게 한다. 죽은 냥이 id 를 돌려준다 */
+function crash(aMass: number, bMass: number) {
+  const w = newWorld("duo", [{ id: 1, name: "a", look: "tabby" }, { id: 2, name: "b", look: "patch" }, { id: 3, name: "c", look: "cheese" }], 0);
+  const [a, b, c] = w.snakes;
+  c.pts = c.pts.map((_, i) => ({ x: -900 - i * 6, y: 0 })); // 멀리 치워 둔다
+  a.mass = aMass;
+  b.mass = bMass;
+  const lay = (s: Snake, n: number, at: (i: number) => { x: number; y: number }) => (s.pts = Array.from({ length: n }, (_, i) => at(i)));
+  lay(b, 60, (i) => ({ x: 200 - i * 6, y: 0 }));
+  lay(a, 60, (i) => ({ x: 40, y: -40 - i * 6 }));
+  b.angle = 0;
+  a.angle = Math.PI / 2;
+  const died: GameEvent[] = [];
+  const before = a.mass;
+  for (let i = 0; i < 90 && !died.length; i++) {
+    step(w, DT, { 1: { angle: Math.PI / 2 }, 2: { angle: 0 }, 3: { angle: Math.PI } });
+    died.push(...w.events.filter((e) => e.t === "die"));
+  }
+  return { died, a, b, gained: a.mass - before };
+}
+
+{
+  const big = crash(80, 20);
+  check("큰 냥이가 작은 냥이 몸에 머리를 박으면 큰 냥이는 살고 작은 냥이가 먹힘", big.a.alive && !big.b.alive && big.died.some((e) => e.t === "die" && e.id === 2 && e.by === 1));
+  check(`먹으면 바로 자람 (+${big.gained.toFixed(1)})`, big.gained >= 5);
+  check(`연인 머리 점수 (${duoScore(big.a)} = ${big.a.best} + ${RIVAL_BONUS})`, duoScore(big.a) === big.a.best + RIVAL_BONUS);
+  const small = crash(20, 80);
+  check("작은 냥이가 큰 냥이 몸에 박으면 작은 냥이가 죽음", !small.a.alive && small.b.alive && small.b.kills === 1);
+  const even = crash(20, 21);
+  check("크기가 비슷하면 박은 쪽이 죽음", !even.a.alive && even.b.alive);
+  // 컴퓨터 냥이 머리는 HEAD_BONUS
+  check(`컴퓨터 냥이 머리 점수 ${HEAD_BONUS}`, duoScore({ best: 30, kills: 3, rivalKills: 1 }) === 30 + 2 * HEAD_BONUS + RIVAL_BONUS);
 }
 
 {

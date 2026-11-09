@@ -82,13 +82,13 @@ function sameKey(a: ArrayBuffer | null, b: Uint8Array): boolean {
 
 /**
  * 앱이 열릴 때마다 이 기기 구독을 다시 저장 (다른 계정으로 바뀌었거나, 브라우저가 구독을 갱신했거나,
- * 서버가 못 쓰는 구독이라 지웠을 때)
+ * 서버가 못 쓰는 구독이라 지웠을 때). 알림 권한은 허용인데 구독이 사라졌으면(iOS 가 끊었거나
+ * 브라우저가 정리함) 새로 만든다 — 사용자는 '켜짐'으로 알고 있으니까.
  */
 export async function refreshPush() {
   if (!pushSupported() || Notification.permission !== "granted") return;
   try {
-    const reg = await registerSW();
-    if (await reg.pushManager.getSubscription()) await saveSubscription(await subscribe(reg));
+    await saveSubscription(await subscribe(await registerSW()));
   } catch (e) {
     console.error("[push] refresh failed", e);
   }
@@ -140,6 +140,14 @@ export async function sendPush(payload: PushPayload, to?: "me"): Promise<PushRes
     console.error("[push] send failed", e);
     return { error: "알림을 보내지 못했어요. 인터넷 연결을 확인해 주세요." };
   }
+}
+
+/** 알림이 연인에게 닿지 못했으면 그 까닭 (닿았으면 null) */
+export function pushProblem(r: PushResult | { error: string }): string | null {
+  if ("error" in r) return r.error;
+  if (r.devices === 0) return "연인 폰에 알림이 꺼져 있어요. 연인이 앱 설정(⚙️)에서 ‘알림 켜기’를 눌러야 받을 수 있어요.";
+  if (r.sent === 0) return "연인 폰의 알림 연결이 끊겼어요. 연인이 앱을 한 번 열면 다시 연결돼요.";
+  return null;
 }
 
 /**
